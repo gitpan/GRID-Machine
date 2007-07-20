@@ -339,7 +339,7 @@ By default the home directory. For example:
 
 If it does not exist is created.
 
-See the section L<EXAMPLES> for a full example.
+See the section L<EXAMPLE> for a full example.
 
 =item * startenv
 
@@ -1118,8 +1118,10 @@ When executed, the former program produces an output like this:
 L<The sub Method> permits the installation of a remote subroutine as a method
 of the C<GRID::Machine> object. This is valid when only a few subroutines are involved.
 However for large number of subroutines that procedure is error prone. It seems
-to be better to have the code in some module and once the components have been
-testet, loaded onto the remote machine. This is what C<include> is for. 
+to be better to have the code in some separated module.
+This way we can test the components on the local machine and, once we are 
+confident of their correct behavior, proceed to 
+load them onto the remote machine. This is what C<include> is for. 
 
 =head3 Syntax of C<include>
 
@@ -1134,8 +1136,9 @@ Once C<Some/Module.pm> is found all the subroutines inside the module
 will be loaded as methods of the C<GRID::Machine> (singleton) object C<$m>. Code outside subroutines,
 plain old documentation and comments will be ignored. Everything after the markers
 C<__END__> or C<__DATA__> will also be ignored.
-Subroutines C<f1> and C<f2> will be excluded from the process.
-Subroutine will be renamed as C<min> and subroutine C<g2> will be renamed as C<max>.
+The presence of the parameter 'C<exclude =E<gt> [ qw( f1 f2 ) ]>' means that 
+subroutines C<f1> and C<f2> will be excluded from the process.
+Subroutine C<g1> will be renamed as C<min> and subroutine C<g2> will be renamed as C<max>.
 
 Consider the following I<Remote Module>:
 
@@ -1161,7 +1164,7 @@ That is used by the following program:
      2  use strict;
      3  use GRID::Machine;
      4
-     5  my $host = $ENV{GRID_REMOTE_MACHINE} || 'casiano@orion.pcg.ull.es';
+     5  my $host = $ENV{GRID_REMOTE_MACHINE} || 'user@remote.machine';
      6
      7  my $machine = GRID::Machine->new( host => $host);
      8
@@ -1178,8 +1181,8 @@ That is used by the following program:
 Then function C<two> is excluded and the subroutine C<last> is renamed as C<LAST>:
 
   $ include5.pl
-  casiano@orion.pcg.ull.es can do LAST
-  casiano@orion.pcg.ull.es can do one
+  user@remote.machine can do LAST
+  user@remote.machine can do one
   9
 
 =head3 Remote Modules
@@ -1258,8 +1261,12 @@ C<LOCAL>:
 =over 2
 
 =item *
-A C<use> pragma inside a I<Remote Module> indicates that such module will be loaded
-onto the remote machine.
+A C<use Something> pragma inside a I<Remote Module> indicates that such module 
+C<Something> will be loaded
+onto the remote machine. Of course, the module
+must be available there. An alternative to install it
+is to transfer the module(s) on the local 
+machine to the remote machine using C<modput>.
 
 =item *
 A C<LOCAL { code }> directive inside a I<Remote Module> wraps C<code> that 
@@ -1269,7 +1276,7 @@ load subroutines as in the example below.
 =back
 
 The following remote module contains a C<use> pragma in line 2. The call to 
-C<include> will load C<List::Util> on the remote machine and will import
+C<include> will load C<List::Util> on the remote machine importing
 the C<sum> function.
 
   $ cat -n Include4.pm
@@ -1340,9 +1347,14 @@ When executed the program produces an output like:
 
 =head2 The C<GRID::Machine::Core> Class 
 
+The creation of a C<GRID::Machine> object through a call to C<GRID::Machine-E<gt>new>
+implies the loading of a I<Remote Module> called  C<GRID::Machine::Core> which is delivered
+with the C<GRID::Machine> distribution.
+
 The following functions defined in the Remote Module C<GRID::Machine::Core> are loaded
 via the C<include> mechanism on the remote machine. Therefore, they work as methods of the
-C<GRID::Machine> object on the local machine.
+C<GRID::Machine> object on the local machine. They perform the same operations than their Perl
+aliases:
 
 =head3 Function C<getcwd>
 
@@ -1493,7 +1505,6 @@ them.  When executed the former program produces the list of installed subroutin
 
                     $ accessobject.pl
                     tar
-                    uname
                     system
                     installed
                     getcwd
@@ -1507,15 +1518,6 @@ Syntax:
 
 Reads from the link. Returns the type of operation/tag and the results of the 
 operation.
-
-=head2 The C<send_operation> Method 
-
-Syntax:
-
-	  $server->send_operation( $OPERATION, @results );
-
-Writes to the communication C<ssh> link the type of operation and the 
-C<results>. It is responsible of marshalling C<results>.
 
 =head2 The C<send_error> Method 
 
@@ -1542,78 +1544,39 @@ C<send_result> to send  results to the client
 
 =head1 EXTENDING THE PROTOCOL
 
-To extend the protocol we have two write a pair of mirror-side modules. One will run on the local
-machine and the other on the remote machine. Let us see a simple example. We will extend the
-protocol with a new tag C<MYTAG>. First comes the local component of the pair:
+Let us see a simple example. We will extend the
+protocol with a new tag C<MYTAG>. 
+We have to write a module that will be used in the remote
+side of the link:
 
-  $ cat -n MyLocal.pm
-     1  package MyMachine;
-     2  use base GRID::Machine;
-     3  use strict;
-     4
-     5  sub myrequest {
-     6     my $self = shift;
-     7     my $name = shift;
-     8
-     9     $self->send_operation( "MyMachine::MYTAG", $name );
+  $ cat -n MyRemote.pm      
+     1  package GRID::Machine;
+     2  use strict;
+     3
+     4  sub MYTAG {
+     5    my ($server, $name) = @_;
+     6
+     7    $server->send_operation("RETURNED", "Hello $name!\n") if defined($name); 
+     8    $server->send_operation("DIED", "Error: Provide a name to greet!\n");
+     9  }
     10
-    11     my ($type, $result) = $self->read_operation();
-    12     return $result if $type eq "RETURNED";
-    13     return;
-    14  }
-    15
-    16  1;
+    11  1;
 
 
-The module inherits from C<GRID::Machine>. 
-The method C<myrequest> will be used by local objects to request a communication
-with such tag.  Actually, I<the tag is the name of the remote method that will handle
-this request>. 
-The C<myrequest> method receives the C<MyMachine> object followed by any data to be sent.
-The methods C<send_operation> and C<read_operation> (in module L<GRID::Machine::Message>)
-provide the infrastructure for sending and receiving pure Perl data structures. 
-
-Observe the use of the full name of the method handling this tag in line 9. 
-When extending the protocol use always the full specification of the subroutine.
-This way has also the benefit of avoiding tag collisions between different modules
-extending C<GRID::Machine>.
-
-This is the remote component of the pair:
-
-  $ cat -n MyRemote.pm
-     1  package MyMachine;
-     2  our @ISA = qw(GRID::Machine);
-     3  use strict;
-     4
-     5  sub MYTAG {
-     6    my ($server, $name) = @_;
-     7
-     8    $server->send_operation("RETURNED", "Hello $name!\n") if defined($name);
-     9    $server->send_operation("DIED", "Error: Provide a name to greet!\n");
-    10  }
-    11
-    12  1;
-
-This component will be loaded on the remote machine via the ssh link. The remote side 
-of the module C<GRID::Machine> was already loaded when this module arrived. In fact, modules
-loaded this way are never written to disk on the remote side. Therefore, any attempt
-to substitute line 2 by C<use base GRID::Machine> will fail.
-
-The method C<MYTAG> is the remote partner of the local method C<myrequest>. The name of this method
-must be the same than the name of the tag (operation type) used to send the request 
-(local method C<myrequest>, line 9). 
-
-And last, here is a client program using the new tag:
+This component will be loaded on the remote machine via the ssh link.
+The name of the handling method C<MYTAG>
+must be the same than the name of the tag (operation type) used to send the request. 
+Here is a client program using the new tag:
 
   $ cat -n extendprotocol.pl
      1  #!/usr/local/bin/perl -w
      2  use strict;
-     3  use MyLocal;
+     3  use GRID::Machine;
      4
      5  my $name = shift;
-     6  my $host = 'user@remote.machine.domain';
+     6  my $host = 'user@remote.machine';
      7
-     8  my $machine = MyMachine->new(host => $host, remotelibs => [ qw(MyRemote) ]);
+     8  my $machine = GRID::Machine->new(host => $host, remotelibs => [ qw(MyRemote) ]);
      9
     10  $machine->send_operation( "MYTAG", $name);
     11  my ($type, $result) = $machine->read_operation();
@@ -1633,8 +1596,7 @@ When the program is executed we get the following output:
 
 The class C<GRID::Machine::Result> is used by both the local and remote
 sides of the C<GRID::Machine>, though most of its methods are called 
-on the remote side. You can skip this section unless you are interested in 
-extending the protocol (see section L<EXTENDING THE PROTOCOL>).
+on the remote side. 
 
 The result of a RPC is a C<GRID::Machine::Result> object. 
 Such object has the following attributes:
@@ -1708,8 +1670,6 @@ context the C<str> will be called.
 This class is used by both the local and the remote sides of the
 C<GRID::Machine>. It implements the low level communication 
 layer. It is responsible of marshalling the data.
-Unless you are extending the protocol tehre is no
-need to directly access the methods introduced in this section.
 
 =head2 The C<read_operation> Method
 
@@ -1790,7 +1750,7 @@ Here are the contents:
 =head2 X Forwarding
 
 X forwarding via C<ssh -X > does not work. C<GRID::Machine> uses C<open2> (see L<IPC::Open2>)
-to set the connection and share its limitations. The following program produces an error:
+to set the connection and shares its limitations. The following program produces an error:
 
     use GRID::Machine qw(is_operative);
     use Data::Dumper;
@@ -1864,12 +1824,12 @@ When executed this program produces the following output:
 
 =head3 Wish List
 
-It will benefit this module f we have a more OOP oriented C<Data::Dumper>
+It will benefit this module to have a more OOP oriented C<dumper>
 so that if the objet being dumped is I<opaque> but has a C<Dumper> 
 method, such method will be called. The idea being that anyone
 developing some sort of external object (C, XS, etc.) will collaboratively
 define a C<Dumper> method specifying how the object will be dumped.
-That can be a goal to fulfill.
+That is a goal to fulfill.
   
 =head2 Call by Reference
 
@@ -1921,6 +1881,7 @@ When explicited by the client program it exports these functions:
 =item * L<IPC::PerlSSH>
 
 =back
+
 =head1 AUTHOR
 
 Casiano Rodriguez Leon E<lt>casiano@ull.esE<gt>

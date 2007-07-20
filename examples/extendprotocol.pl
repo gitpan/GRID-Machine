@@ -1,11 +1,11 @@
 #!/usr/local/bin/perl -w
 use strict;
-use MyLocal;
+use GRID::Machine;
 
 my $name = shift;
 my $host = 'casiano@beowulf.pcg.ull.es';
 
-my $machine = MyMachine->new(host => $host, remotelibs => [ qw(MyRemote) ]);
+my $machine = GRID::Machine->new(host => $host, remotelibs => [ qw(MyRemote) ]);
 
 $machine->send_operation( "MYTAG", $name);
 my ($type, $result) = $machine->read_operation();
