@@ -1,0 +1,6 @@
+Revision history for Perl extension GRID::Machine.
+
+0.01  Wed May 16 13:12:17 2007
+	- original version; created by h2xs 1.23 with options
+		-XA -n GRID::Machine
+

@@ -1,0 +1,1953 @@
+=head1 NAME
+
+GRID::Machine - Remote Procedure Calls over a SSH link
+
+=head1 SYNOPSIS
+
+  use GRID::Machine;
+
+  my $host = shift || 'mylogin@remote.machine';
+
+  my $machine = GRID::Machine->new(host => $host, uses => [ 'Sys::Hostname' ]);
+
+  # Install function 'rmap' on remote.machine
+  my $r = $machine->sub( 
+    rmap => q{
+      my $f = shift;        
+      die "Code reference expected\n" unless UNIVERSAL::isa($f, 'CODE');
+
+      my @result;
+      for (@_) {
+        die "Array reference expected\n" unless UNIVERSAL::isa($_, 'ARRAY');
+
+        print hostname().": processing row [ @$_ ]\n";
+        push @result, [ map { $f->($_) } @$_ ];
+      }
+      return @result;
+    },
+  );
+  die $r->errmsg unless $r->ok;
+
+  my $cube = sub { $_[0]**3 };
+
+  # RPC involving code references and nested structures ...
+  $r = $machine->rmap($cube, [1..3], [4..6], [7..9]);
+  print $r; # Dumps remote stdout and stderr
+
+  for ($r->Results) {               # Output:
+    my $format = "%5d"x(@$_)."\n";  #    1    8   27
+    printf $format, @$_             #   64  125  216
+  }                                 #  343  512  729
+
+
+=head1 DESCRIPTION
+
+This module is inspired in the L<IPC::PerlSSH> module by Paul Evans.
+This module provides Remote Procedure Calls
+(RPC) via a SSH connection. What made L<IPC::PerlSSH> appealing to me
+was that 
+
+  'no special software is required on the remote end, other than the
+  ability to run perl nor are any special administrative rights required;
+  any account that has shell access and can execute the perl binary on
+  the remote host can use this module'.
+
+The only requirement being that automatic SSH autentification
+between the local and remote hosts has been established.
+I have tried to expand the capabilities but preserving this feature.
+
+=over 2
+
+=item * Provide I<Remote Procedure Calls> (RPC). Subroutines on the remote
+side can be called with arbitrary nested structures as arguments from
+the local side.
+
+=item * The result of a remote call is a L<GRID::Machine::Result>
+object. Among the attributes of such object are the C<results> of the call, 
+the ouput produced in C<stdout> and C<stderr>, C<errmsg> etc. The remote function 
+can produce output without risk of misleading the protocol.
+
+=item * Services for the transference of files are provided
+
+=item * Support for writing and management 
+I<Remote Modules> and the transference of Classes and Modules
+between machines
+
+=item * An Extensible Protocol
+
+=back
+
+=head1 INSTALLATION
+
+To install this module, follow these two steps:
+
+=over
+
+=item  * Set automatic ssh-authentification with a machine where you have an account
+
+=item  * Before running the tests. Set on the local machine the environment variable 
+C<GRID_REMOTE_MACHINE> to point to a machine that is available using automatic authenticatication. 
+For example, on a C<bash>:
+
+        export GRID_REMOTE_MACHINE=user@machine.domain
+
+Otherwise most connectivity tests will be skipped. This and the previous steps are optional.
+
+=item * Follow the traditional steps:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+=back
+
+=head1 DEPENDENCIES
+
+This module requires these other modules and libraries:
+
+=over 2
+
+=item *  Module::Which version '0.0205'
+
+=back 
+
+=head1 METHODS ON THE LOCAL SIDE
+
+=head2 The Constructor C<new>
+
+The typical call looks like:
+
+    my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
+
+This function returns a new instance of an object. 
+The object is blessed in a unique class that inherits from 
+C<GRID::Machine>. That is, the new object is a I<singleton>.
+When later the machine object is provided with new methods,
+those are installed in the I<singleton> class.
+The following example illustrates the point.
+
+  $ cat -n classes.pl
+   1  #!/usr/local/bin/perl -w
+   2  use strict;
+   3  use GRID::Machine;
+   4
+   5  my @m = qw(orion beowulf);
+   6
+   7  my $m = GRID::Machine->new( host => shift @m, uses => [qw(Sys::Hostname)]);
+   8  print ref($m)."\n";
+   9
+  10  $m->sub( one => q { print hostname().": one\n"; } );
+  11  print $m->one;
+  12
+  13  my $p = GRID::Machine->new( host => shift @m,  uses => [qw(Sys::Hostname)] );
+  14  print ref($p)."\n";
+  15
+  16  $p->sub( one => q { print hostname().": 1\n"; } );
+  17  print $p->one;
+
+There are two C<GRID::Machine> objects involved: C<$m> (for a connection to 
+a machine named C<orion>)
+and C<$p> (connection to a machuine named C<beowulf>) created at lines 7 and 13. 
+Two subroutines with the same name C<one> are installed
+on both machines (lines 10 and 16). As remote functions
+they don't collide since they are being executed in two different machines.
+As local methods they don't collide too since 
+the method C<one> of C<$m> lives in a different namespace than
+the method C<one> of C<$p>.
+The remote functions are called in lines 11 and 17. The result 
+of such call is a C<GRID::Machine::Result> object. 
+Such C<GRID::Machine::Result> object describes the result of the 
+RPC. It has attributes like: 
+
+=over 2
+
+=item C<results> 
+
+A reference to an C<ARRAY> holding the results returned
+by the call
+
+=item C<stdout> 
+
+The ouput produced in the remote C<stdout> during the execution
+of the RPC
+
+=item C<stderr> 
+
+The ouput produced in the remote C<stderr> during the execution
+of the RPC
+
+=back
+
+etc. 
+
+Wherever is evaluated in a string context a C<GRID::Machine::Result> object
+returns a string containing the output produced (to both C<stdout> and C<stderr> plus 
+any specific perl error messages as in C<$@>)
+during the execution of the RPC.
+When executed the former program will produce an output similar to this:
+
+                          $ classes.pl
+                          GRID::Machine::138737228
+                          orion: one
+                          GRID::Machine::139666876
+                          beowulf: 1
+
+=head3 Exceptions
+ 
+The constructor doesn't return on failure:
+It raises an exception if the connection can't be 
+established. 
+See the result of an attempt to connect to a machine when there is no automatic authentification:
+
+  $ perl -MGRID::Machine -e " GRID::Machine->new( host => 'user@not.available')"
+  ssh: connect to host not.available port 22: No route to host
+  Can't execute perl in user@not.available using ssh connection with automatic authentication
+
+=head3 Arguments of C<new>
+
+The following arguments are legal:
+
+=over 2
+
+=item * host
+
+The host to connect. The user can be specified here.
+
+=item * log
+
+Relative path of the file where remote C<STDOUT> will be redirected.
+Each time a RPC occurs STDOUT is redirected to a file. By default the name of this file
+is C<$ENV{HOME}/rperl$$.log> where C<$$> is the PID of the program running
+in the local machine.
+
+=item * err
+
+Relative path of the file where remote C<STDERR> will be redirected.
+Each time a RPC occurs STDERR is redirected to a file. By default the name of this file
+is C<$ENV{HOME}/rperl$$.err> where C<$$> is the PID of the program running
+in the local machine.
+
+=item * wait
+
+Maximum number of seconds to wait for the setting of the connection.
+If an automatic connection can't be established in such time.
+The constructor calls the L<is_operative function|"The Function is_operative"> to check this.
+The default value is 15 seconds.
+
+=item * ssh
+
+A string.  Specifies the C<ssh> command to be used. Take advantage of this if
+you want to specify some special parameters. Defaults to C<ssh>. 
+
+=item * scp
+
+A string defining the program to use to transfer files between the local and remote
+machines. Defaults to C<scp -q -p>.
+
+=item * readfunc
+
+=item * writefunc
+
+=item * cleanup
+
+Boolean. If true the remote log files for STDOUT and STDERR will be erased
+when the connection ends. True by default.
+
+=item * sendstdout
+
+Boolean. If true the contents of STDOUT and STDERR after each RPC are sent 
+to the client. By default is true. The following example illustrates its use:
+
+  $ cat -n package.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $s = shift || 0;
+     6  my $machine = 'user@remote.machine.domain';
+     7
+     8  my $m = GRID::Machine->new( host => $machine, sendstdout => $s);
+     9
+    10  my $p = $m->eval(
+    11    q{
+    12      print "Name of the Caller Package: ";
+    13      return caller(0)
+    14    }
+    15  );
+    16  print "$p",$p->result,"\n";
+
+when executed with argument 0 the remote output is not saved and sent, but the returned
+result is still available:
+
+                    $ package.pl 1
+                    Name of the Caller Package: GRID::Machine
+                    $ package.pl 0
+                    GRID::Machine
+
+
+=item * perl
+
+A string. The perl interpreter to use in the remote machine.
+See an example:
+
+  $ cat -n poption.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $machine = shift || 'remote.machine.domain';
+     6  my $m = GRID::Machine->new(
+     7    host => $machine,
+     8    perl => 'perl -I/home/user/prefix -I/home/user/perl',
+     9  );
+    10
+    11  print $m->eval( q{
+    12      local $" = "\n";
+    13      print  "@INC";
+    14    }
+
+when executed the program produces an output similar to this:
+
+    $ poption.pl
+    /home/user/prefix
+    /home/user/perl
+    /etc/perl
+    /usr/local/lib/perl/5.8.4
+    etc. etc.
+
+=item * remotelibs
+
+An C<ARRAY> reference. The referenced array contain the list of modules
+that will be loaded when bootstrapping
+the remote perl server. It is used to extend the C<GRID::Machine> protocol. 
+By default the following modules are loaded:
+
+            GRID::Machine::MakeAccessors  
+            GRID::Machine::Message
+            GRID::Machine::Result
+            GRID::Machine::REMOTE
+
+See the section L<EXTENDING THE PROTOCOL> for a full example.
+
+=item * startdir
+
+The string specifying the directory where the remote execution starts.
+By default the home directory. For example:
+
+    my $m = GRID::Machine->new(host => $host, startdir => '/tmp');
+
+If it does not exist is created.
+
+See the section L<EXAMPLES> for a full example.
+
+=item * startenv
+
+A reference to a hash. It will be used to modify the remote
+C<%ENV>.
+
+=item * pushinc
+
+Reference to a list of directories. All this directories will be C<push>ed in the C<@INC>
+list of the remote machine
+
+=item * unshiftinc
+
+Reference to a list of directories. All this directories will be C<unshift>ed in the C<@INC>
+list of the remote machine. See an example:
+
+    use GRID::Machine;
+
+    my $m = GRID::Machine->new(
+      host => 'remote.machine.domain',
+      unshiftinc => [ qw(/home/user/prefix /home/user/perl) ],
+    );
+
+    print $m->eval(q{ local $" = "\n"; print  "@INC"; });
+
+
+=item * prefix
+
+Libraries can be transferred from the local to the remote server.
+The prefix option is a string containing the directory where 
+the libraries will be stored. By default is C<$ENV{HOME}/perl5lib>.
+
+=item * uses
+
+A reference to an ARRAY of strings. Determines the modules that will be 
+loaded when the remote Perl interpreter is started. For instance:
+
+  my $machine = GRID::Machine->new(host => $host, uses => [ 'POSIX qw( uname )' ])
+
+See the section 
+L<Opaque Structures> for a full example
+
+=back
+
+=head2 The C<eval> Method
+
+The syntax is:
+
+            $result = $machine->eval( $code, @args )
+
+This method evaluates code in the remote host, passing arguments and returning
+a C<GRID::Machine::Result> object. See an example:
+
+    use GRID::Machine qw(is_operative);
+    use Data::Dumper;
+
+    my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
+
+    my $p = { name => 'Peter', familyname => [ 'Smith', 'Garcia'], age => 31 };
+
+    print Dumper($machine->eval(q{
+      my $q = shift;
+
+      $q->{familyname}
+
+      }, $p
+    ));
+
+=head3 The Result of a RPC
+
+When executed, the former code produces the following output:
+
+    $ struct.pl
+    $VAR1 = bless( {
+                     'stderr' => '',
+                     'errmsg' => '',
+                     'type' => 'RETURNED',
+                     'stdout' => '',
+                     'errcode' => 0,
+                     'results' => [
+                                    [ 'Smith', 'Garcia' ]
+                                  ]
+                   }, 'GRID::Machine::Result' );
+
+A C<GRID::Machine::Result> result object describes the result of a RPC.
+The C<results> attribute is an ARRAY reference holding the result returned
+by the call. The other attributes C<stdout>, C<stderr>, etc. hold
+the respective outputs. 
+See section L<THE GRID::Machine::Result CLASS> for a more detailed description
+of C<GRID::Machine::Result> objects.
+
+=head3 The Algorithm of C<eval>
+
+When a call
+
+            $result = $machine->eval( $code, @args )
+
+occurs, the code C<$code> should be passed in a string, and is compiled using a string
+C<eval> in the remote host:
+
+               my $subref = eval "use strict; sub { $code }";
+
+Files C<STDOUT> and C<STDERR> are redirected and the subroutine
+referenced by C<$subref> is called 
+inside an eval with the specified arguments:
+
+                my @results = eval { $subref->( @_ ) };
+
+=head3 Errors and Exceptions
+
+If there are errors at compile time, they will be
+collected into the  C<GRID::Machine::Result> object. 
+In the following example the code to eval has an error (variable
+C<$q> is not declared):
+
+
+    use GRID::Machine;
+    use Data::Dumper;
+
+    my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
+
+    my $p = { name => 'Peter', familyname => [ 'Smith', 'Garcia'] };
+
+    my $r = $machine->eval( q{ $q = shift; $q->{familyname} }, $p);
+
+    die  Dumper($r) unless $r->ok;
+
+    print "Still alive\n";
+
+When executed this code produces something like:
+
+  $ syntaxerr2.pl
+  $VAR1 = bless( {
+     'stderr' => '',
+     'errmsg' => 'user@remote.machine.domain: Error compiling code  $q = shift; $q->{familyname}. \
+       Global symbol "$q" requires explicit package name at (eval 27) line 1, <STDIN> line 32. \
+       Global symbol "$q" requires explicit package name at (eval 27) line 1, <STDIN> line 32.',
+     'type' => 'DIED',
+     'stdout' => '',
+     'errcode' => 0
+   }, 'GRID::Machine::Result' );
+
+C<GRID::Machine::Result> objects have an C<ok> method which
+returns TRUE if the RPC call didn't died. Therefore a common idiom
+after a RPC is:
+
+                          die "$r" unless $r->ok;
+
+The former error message though accurate 
+
+          Global symbol "$q" requires ...
+
+does not tell the exact line number and file source. 
+Use a C<#line> pragma (see line 11 below) to get better diagnostics:
+
+     $ cat -n syntaxerr4.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  use Data::Dumper;
+     5
+     6  my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
+     7
+     8  my $p = { name => 'Peter', familyname => [ 'Smith', 'Garcia'] };
+     9
+    10  my $r = $machine->eval( q{
+    11  #line 12 syntaxerr4.pl
+    12      $q = shift;
+    13      $q->{familyname}
+    14    }, $p
+    15  );
+    16
+    17  die "$r" unless $r->ok;
+ 
+Now the execution produces the following output:
+
+ $ syntaxerr4.pl
+  user@remote.machine.domain: Error compiling code. \
+    Global symbol "$q" requires explicit package name at syntaxerr4.pl line 12, \
+    <STDIN> line 32.
+    Global symbol "$q" requires explicit package name at syntaxerr4.pl line 13, \
+    <STDIN> line 32.
+
+=head3 Scope and Visbility Issues
+
+Since the C<eval> method wraps the code into a subroutine like this
+
+               my $subref = eval "use strict; sub { $code }";
+
+variables declared using C<our> inside an C<eval> must be redeclared
+in subsequent C<evals> to make them visible. The following code produces an error message:
+
+  $ cat -n vars1.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
+     6
+     7  $machine->eval(q{
+     8    our $h;
+     9    $h = [4..9];
+    10  });
+    11
+    12  my $r = $machine->eval(q{
+    13  #line 14 "vars1.pl"
+    14    $h = [map {$_*$_} @$h];
+    15  });
+
+
+The interpreter complains about C<$h>:
+
+  $ vars1.pl
+  Variable "$h" is not imported at vars1.pl line 14, <STDIN> line 36.
+  Variable "$h" is not imported at vars1.pl line 14, <STDIN> line 36.
+
+
+The problem can be solved by redeclaring C<our $h> in the second C<eval> or changing
+the declaration at line 8 by C<use vars>:
+
+      7 $machine->eval(q{
+      8   use vars qw{$h};
+      9   $h = [4..9];
+     10 });
+
+=head3 Closures
+
+One of the consequences of wrapping C<$code> inside a sub is that any
+lexical variable is limited to the scope of the C<eval>.
+Another is that nested subroutines inside C<$code> will live in
+a (involutary)  I<closure>. See the example:
+
+  $ cat -n vars5.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
+     6
+     7  my $r = $machine->eval(q{
+     8  #line 9  "vars3.pl"
+     9    my $h = 1;
+    10
+    11    sub dumph {
+    12      print "$h";
+    13      $h++
+    14    }
+    15
+    16    dumph();
+    17  });
+    18
+    19  print "$r\n";
+    20
+    21  $r = $machine->eval(q{
+    22  #line 23  "vars3.pl"
+    23    dumph();
+    24  });
+    25
+    26  print "$r\n";
+
+
+
+When executed, the program produces the following warning:
+
+  $ vars5.pl
+  Variable "$h" will not stay shared at vars3.pl line 12, <STDIN> line 32.
+  1
+  2
+
+The warning announces that later calls (in subsequent C<eval>s) to sub 
+C<dumph> can no longer reach C<$h> (Other than trhough C<dumph> itself).
+If you want lexical nested subroutines declare them thorugh a reference:
+
+  $ cat -n vars6.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
+     6
+     7  my $r = $machine->eval(q{
+     8  #line 9  "vars3.pl"
+     9    my $h = 1;
+    10
+    11    use vars '$dumph';
+    12    $dumph = sub {
+    13      print "$h"; 
+    14      $h++;
+    15    };
+    16
+    17    $dumph->(); # Prints 1
+    18  });
+    19
+    20  print "$r\n";
+    21
+    22  $r = $machine->eval(q{
+    23  #line 27  "vars3.pl"
+    24    $dumph->(); # Prints 2
+    25  });
+    26
+    27  print "$r\n";
+
+
+=head2 The C<compile> Method
+
+Syntax:
+
+                   $machine->compile( $name, $code )
+                   $machine->compile( $name, $code, politely => $politely )
+
+This method sends code to the remote host to store it inside the remote
+side of the C<GRID::Machine> object. Namely, the C<stored_procedures> 
+attribute of the remote object is a hash reference containing the stored 
+subroutines. The C<$code> is compiled into a C<CODE> reference which
+can be executed later through the C<call> method.
+
+The subroutine name C<$name> must be an identifier, i. e. must match
+the regexp C<[a-zA-Z_]\w*>. Full names aren't allowed.
+
+The following example uses C<compile> to
+install handlers for the most common file-testing
+functions C<-r> (is readable), C<-w> (writeable), etc. (lines 6-13):
+
+     1  use GRID::Machine;
+     2
+     3  my $machine = shift || 'remote.machine.domain';
+     4  my $m = GRID::Machine->new( host => $machine );
+     5
+     6  for (qw(r w e x z s f d  t T B M A C)) {
+     7    $m->compile( "$_" => qq{
+     8        my \$file = shift;
+     9
+    10        return -$_ \$file;
+    11      }
+    12    );
+    13  }
+    14
+    15  my @files = $m->eval(q{ glob('*') })->Results;
+    16
+    17  for (@files) {
+    18    print "$_ is a directory\n" if $m->call('d', "$_")->result;
+    19  }
+
+After the testing functions  are installed (lines 6-13),
+a list of files in the current (remote) directory is obtained (line 15)
+and those which are directories are printed (lines 17-19).
+
+=head3 Collisions
+
+When two functions are installed with the same name
+the last prevails:
+
+            use GRID::Machine;
+
+            my $machine = shift || 'remote.machine.domain';
+            my $m = GRID::Machine->new( host => $machine );
+
+            $m->compile(one => q{print "one\n"; });
+
+            $m->compile(one => q{ print "1\n"; });
+
+            my $r= $m->call("one");
+            print $r; # prints 1
+
+
+To avoid overwriting an existent function the C<exists> method can be used:
+
+            use GRID::Machine;
+
+            my $machine = shift || 'remote.machine.domain';
+            my $m = GRID::Machine->new( host => $machine );
+
+            $m->compile(one => q{ print "one\n"; });
+
+            $m->compile(one => q{ print "1"; }) unless $m->exists('one');
+
+            my $r= $m->call("one");
+            print $r; # prints "one"
+
+
+an alternative solution is to use the C<politely> argument of C<compile>. 
+If true the function won't be
+overwritten:
+
+
+            use GRID::Machine;
+
+            my $machine = shift || 'remote.machine.domain';
+            my $m = GRID::Machine->new( host => $machine );
+
+            my $r = $m->compile(one => q{ print "one\n"; });
+
+            $r = $m->compile(
+              one => q{ print "1"; },
+              politely => 1 # Don't overwrite if exists
+            );
+            print $r->errmsg."\n";
+
+            $r= $m->call("one");
+            print $r; # prints "one"
+
+When executed, the former program produces this output:
+
+    $ compile5.pl
+    Warning! Attempt to overwrite sub 'one'. New version was not installed.
+    one
+
+=head2 The C<sub> Method
+
+Syntax:
+
+                    $machine->sub( $name, $code )
+                    $machine->sub( $name, $code, politely => $politely )
+
+This method is identical to the C<compile> method, except that the remote
+C<$code> will be available as a (singleton) 
+method of the C<$machine> object within the local perl
+program. Therefore, two methods of two different C<GRID::Machine> objects with
+the same C<$name> are installed on different name spaces. See the example
+in section
+L<the constructor C<new>|"The Constructor new">
+
+=head2 The C<call> Method
+
+Syntax:
+
+                  $result = $machine->call( $name, @args )
+
+This method invokes a remote method that has earlier been defined using the
+C<compile> or C<sub> methods. The arguments are passed and the result is
+returned in the same way as with the C<eval> method.
+
+
+=head2 Nested Structures
+
+Nested Perl Data Structures can be transferred between the local and remote machines transparently:
+
+      use Data::Dumper;
+
+      my $host = shift || 'user@remote.machine.domain';
+
+      my $machine = GRID::Machine->new(host => $host);
+
+      my $r = $machine->sub(
+        rpush => q{
+          my $f = shift;
+          my $s = shift;
+
+          push @$f, $s;
+          return $f;
+        },
+      );
+      $r->ok or die $r->errmsg;
+
+      my $f = [[1..3], { a => [], b => [2..4] } ];
+      my $s = { x => 1, y => 2};
+
+      $r = $machine->rpush($f, $s);
+      die $r->errmsg unless $r->ok;
+
+      $Data::Dumper::Indent = 0;
+      print Dumper($r->result)."\n";
+
+when executed the program above produces:
+
+      $ nested4.pl
+      $VAR1 = [[1,2,3],{'a' => [],'b' => [2,3,4]},{'y' => 2,'x' => 1}];
+
+=head2 Aliasing
+
+Aliasing between parameters is correctly catched. The following code
+presents (line 25) a remote procedure call to a function C<iguales>
+where the two local arguments C<$w> and C<$z> are the same:
+
+  $ cat -n alias.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $machine = GRID::Machine->new(host => shift(), uses => [ 'Sys::Hostname' ]);
+     6
+     7  my $r = $machine->sub( iguales => q{
+     8  #line 12 "alias.pl"
+     9      my ($first, $sec) = @_;
+    10
+    11      print hostname().": $first and $sec are ";
+    12
+    13      if ($first == $sec) {
+    14        print "the same\n";
+    15        return 1;
+    16      }
+    17      print "Different\n";
+    18      return 0;
+    19    },
+    20  );
+    21  $r->ok or die $r->errmsg;
+    22
+    23  my $w = [ 1..3 ];
+    24  my $z = $w;
+    25  $r = $machine->iguales($w, $z);
+    26  print $r;
+
+when executed the program produces the following output:
+
+    $ alias.pl beowulf
+    beowulf: ARRAY(0x8275040) and ARRAY(0x8275040) are the same
+
+The reciprocal is true. Equality on the remote side translate to
+equality on the local side. The program:
+
+  $ cat -n aliasremote.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $machine = GRID::Machine->new(host => shift(), uses => [ 'Sys::Hostname' ]);
+     6
+     7  $machine->sub( iguales => q{
+     8      my $first = [1..3];
+     9      my $sec = $first;
+    10
+    11      return (hostname(), $first, $sec);
+    12    },
+    13  );
+    14
+    15  my ($h, $f, $s)  = $machine->iguales->Results;
+    16  print "$h: same\n" if $f == $s;
+    17  print "$h: different\n" if $f != $s;
+
+
+produces the following output:
+
+                            $ aliasremote.pl beowulf
+                            beowulf: same
+
+=head2 The C<run> Method
+
+Syntax:
+
+                             $m->run($command)
+
+Is equivalent to 
+
+                             print $m->system($command)
+ 
+Returns true if there were no messages on C<stderr>. 
+
+=head2 The C<exists> Method
+
+Syntax:
+
+                         $machine->exists(q{subname})
+
+Returns true if, and only if, a subroutine  named C<subname>
+has been previously installed on that machine (via C<sub>, C<compile> or some other
+trick). See an example:
+
+    use GRID::Machine;
+
+    my $host = shift || 'user@remote.machine.domain';
+
+    my $machine = GRID::Machine->new(host => $host);
+
+    $machine->sub( one => q{ print "one\n" });
+
+    print "<".$machine->exists(q{one}).">\n";
+    print "<".$machine->exists(q{two}).">\n";
+
+when executed the former code produces the following output:
+
+    $ exists.pl
+    <1>
+    <>
+
+=head1 FUNCTIONS ON THE LOCAL SIDE
+
+
+=head2 The C<read_modules> Function
+
+Syntax: 
+
+                use GRID::Machine qw(read_modules)
+                read_modules(qw(Module:One Module::Two, Module::Three, ...))
+
+Searches for the specified modules C<Module:One>, etc.
+in the current Perl installation.
+Returns a string with the concatenation of the 
+contents of these modules. 
+
+For example, the line:
+
+       read_modules(qw(Parse::Eyapp Parse::Eyapp::))
+
+returns a string containing the concatenation of the contents of all the modules
+in the L<Parse::Eyapp> distribution. Modules are searched by name 
+(like C<'YAML'>) or by subcategories (C<'DBD::'> means all modules under the L<DBD> 
+subdirectories of your Perl installation, matching both 'C<DBD::Oracle>' and 'C<DBD::ODBC::Changes>').
+
+=head2 The Function C<is_operative>
+
+The syntax is:
+
+  is_operative($ssh, $machine, $command, $wait)
+
+Returns true if C<$machine> is available through 
+C<ssh> using automatic authentication and C<$command> can be executed
+on the remote machine in less than C<$wait> seconds. The following example
+illustrates its use:
+
+  $ cat notavailable.pl
+  #!/usr/local/bin/perl -w
+  use strict;
+  use GRID::Machine qw(is_operative);
+
+  my $host = shift || 'user@machine.domain.es';
+  my $command = shift || 'perl -v';
+  my $delay = shift || 1;
+
+  die "$host is not operative\n" unless is_operative('ssh', $host, $command, $delay);
+  print "host is operative\n";
+
+When not specified $command is C<perl -v> and C<$wait> is 15 seconds.
+The following two executions of the former example check the availability
+of machine C<beowulf>:
+
+  $ notavailable.pl beowulf
+  host is operative
+  pp2@nereida:~/LGRID_Machine/examples$ notavailable.pl beowulf chum
+  beowulf is not operative
+
+The negative answer for the second execution is due to the fact that no command
+called C<chum> is available on that machine.
+
+=head1 THE TRANSFERENCE OF FILES 
+
+
+=head2 The C<put> Method
+
+Syntax:
+
+               $m->put([ 'file1', 'file2', ... ], 'targetdir/')
+               $m->put([ 'file1', 'file2', ... ])
+
+Transfer files from the local machine to the remote machine.
+When no target directory is specified the files will be copied into
+the current directory (i.e. C<$ENV{PWD}>). If C<targetdir/> is a relative
+path, it is meant to be relative to the current directory on the remote
+machine.
+It returns TRUE on success. See an example:
+
+    $ cat put.pl
+    #!/usr/local/bin/perl -w
+    use strict;
+    use GRID::Machine;
+
+    my $m = GRID::Machine->new( host => shift());
+
+    $m->chdir('/tmp');
+    $m->put([ $0 ]);
+    $m->run("uname -a; ls -l $0");
+
+
+When executed the program produces:
+
+  $ put.pl orion
+  Linux orion 2.6.8-2-686 #1 Tue Aug 16 13:22:48 UTC 2005 i686 GNU/Linux
+  -rwxr-xr-x  1 casiano casiano 171 2007-07-01 11:46 ./put.pl
+
+If there is only one source file we can specify a new name for the target.
+Thus, the line:
+
+                  $m->put([ $0 ], '/tmp/newname.pl')
+
+will copy the file containing the current program on the remote machine
+as C</tmp/newname.pl>
+
+=head2 The C<get> Method
+
+Syntax:
+
+               $m->get( [ 'file1', 'file2'], ... ], 'targetdir/')
+               $m->get( [ 'file1', 'file2'], ... ])
+
+Performs the reverse action of C<put>.
+Transfer files from the remote machine to the local machine.
+When the paths of the files to transfer C<'file1'>, C<'filer2'>, etc.
+are relative, they are interpreted as relative to the current directory 
+on the remote machine.
+See an example:
+
+    use GRID::Machine;
+
+    my $m = GRID::Machine->new( host => shift(), startdir => 'tutu',);
+
+    $m->put([ glob('nes*.pl') ]);
+    $m->run('uname -a; pwd; ls -l n*.pl');
+
+    print "*******************************\n";
+
+    my $progs = $m->glob('nes*.pl')->results;
+    $m->get($progs, '/tmp/');
+    system('uname -a; pwd; ls -l n*.pl');
+
+When executed the program produces an output similar to this:
+
+  $ get.pl remote
+  Linux remote 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686 GNU/Linux
+  /home/casiano/tutu
+  -rwxr-xr-x 1 casiano casiano 569 2007-05-16 13:45 nested2.pl
+  -rwxr-xr-x 1 casiano casiano 756 2007-05-22 10:10 nested3.pl
+  -rwxr-xr-x 1 casiano casiano 511 2007-06-27 13:08 nested4.pl
+  -rwxr-xr-x 1 casiano casiano 450 2007-06-27 15:20 nested5.pl
+  -rwxr-xr-x 1 casiano casiano 603 2007-05-16 14:49 nested.pl
+  *******************************
+  Linux local 2.4.20-perfctr #6 SMP vie abr 2 18:36:12 WEST 2004 i686 GNU/Linux
+  /tmp
+  -rwxr-xr-x  1 pp2 pp2 569 2007-05-16 13:45 nested2.pl
+  -rwxr-xr-x  1 pp2 pp2 756 2007-05-22 10:10 nested3.pl
+  -rwxr-xr-x  1 pp2 pp2 511 2007-06-27 13:08 nested4.pl
+  -rwxr-xr-x  1 pp2 pp2 450 2007-06-27 15:20 nested5.pl
+  -rwxr-xr-x  1 pp2 pp2 603 2007-05-16 14:49 nested.pl
+
+
+=head1 LOADING CLASSES ONTO THE REMOTE SIDE
+
+=head2  The C<modput> Method
+
+Syntax:
+
+            $machine->modput(@Modulenames)
+
+Where C<@Modulenames> is a list of strings describing modules. 
+Descriptors can be names (like C<'YAML'>) or subcategories (like C<'DBD::'> 
+meaning all modules under the L<DBD> 
+subdirectories of your Perl installation, matching both 'C<DBD::Oracle>' and 'C<DBD::ODBC::Changes>').
+
+The following example will copy all the files in the distribution of C<Parse::Eyapp> 
+to the remote machine inside the directory C<$machine-E<gt>prefix>. After the call 
+to 
+
+            my $r = $machine->install('Parse::Eyapp', 'Parse::Eyapp::')
+
+the module is available for use on the remote machine:
+
+  use GRID::Machine;
+  use Data::Dumper;
+
+  my $host = $ENV{GRID_REMOTE_MACHINE} ||shift;
+
+  my $machine = GRID::Machine->new(host => $host, prefix => q{perl5lib/});
+
+  my $r = $machine->modput('Parse::Eyapp', 'Parse::Eyapp::');
+
+  $r = $machine->eval(q{
+      use Parse::Eyapp;
+
+      print Parse::Eyapp->VERSION."\n";
+    }
+  );
+  print Dumper($r);
+
+When executed, the former program produces an output like this:
+
+  $ modput.pl
+  $VAR1 = bless( {
+                   'stderr' => '',
+                   'errmsg' => '',
+                   'type' => 'RETURNED',
+                   'stdout' => "1.07\n",
+                   'errcode' => 0,
+                   'results' => [ 1 ]
+                 }, 'GRID::Machine::Result' );
+
+=head2 The C<include> Method
+
+L<The sub Method> permits the installation of a remote subroutine as a method
+of the C<GRID::Machine> object. This is valid when only a few subroutines are involved.
+However for large number of subroutines that procedure is error prone. It seems
+to be better to have the code in some module and once the components have been
+testet, loaded onto the remote machine. This is what C<include> is for. 
+
+=head3 Syntax of C<include>
+
+    $m->include(
+          "Some::Module", 
+          exclude => [ qw( f1 f2 ) ], 
+          alias => { g1 => 'min', g2 => 'max' }
+    )
+
+This call will search in the paths in C<@INC> for C<Some/Module.pm>. 
+Once C<Some/Module.pm> is found all the subroutines inside the module
+will be loaded as methods of the C<GRID::Machine> (singleton) object C<$m>. Code outside subroutines,
+plain old documentation and comments will be ignored. Everything after the markers
+C<__END__> or C<__DATA__> will also be ignored.
+Subroutines C<f1> and C<f2> will be excluded from the process.
+Subroutine will be renamed as C<min> and subroutine C<g2> will be renamed as C<max>.
+
+Consider the following I<Remote Module>:
+
+  $ cat -n Include5.pm
+     1  use strict;
+     2
+     3  sub last {
+     4    $_[-1]
+     5  }
+     6
+     7  sub one {
+     8    print 'sub one'."\n";
+     9  }
+    10
+    11  sub two {
+    12    print "sub two\n";
+    13  }
+
+That is used by the following program:
+
+  $ cat -n include5.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $host = $ENV{GRID_REMOTE_MACHINE} || 'casiano@orion.pcg.ull.es';
+     6
+     7  my $machine = GRID::Machine->new( host => $host);
+     8
+     9  $machine->include("Include5", exclude => [ qw(two) ], alias => { last => 'LAST' });
+    10
+    11  for my $method (qw(last LAST one two)) {
+    12    if ($machine->can($method)) {
+    13      print $machine->host." can do $method\n";
+    14    }
+    15  }
+    16
+    17  print $machine->LAST(4..9)->result."\n";
+
+Then function C<two> is excluded and the subroutine C<last> is renamed as C<LAST>:
+
+  $ include5.pl
+  casiano@orion.pcg.ull.es can do LAST
+  casiano@orion.pcg.ull.es can do one
+  9
+
+=head3 Remote Modules
+
+The use of  C<include> lead us to the concept of I<Remote Modules>. A I<Remote Module> 
+contains a family of subroutines that will be loaded onto the remote machine
+via the C<sub> method of C<GRID::Machine> objects.
+
+
+Here is a small example of I<Remote Module>:
+
+  $ cat -n Include.pm
+     1  sub one {
+     2    print "sub one\n";
+     3  }
+     4
+     5  sub two {
+     6    print 'sub two'."\n";
+     7  }
+     8
+     9  sub three {
+    10    print "sub three\n";
+    11  }
+    12
+    13  my $a = "sub five {}\n";
+    14  my $b = 'sub six {}';
+    15
+    16  __DATA__
+    17
+    18  sub four {
+    19    print "four\n";
+    20  }
+
+
+Source after the C<__DATA__> or C<__END__> delimiters are ignored. 
+Also, code outside subroutines (for example lines 13 and 14) and C<pod> documentation are ignored.
+Only the subroutines defined in the 
+module are loaded. See
+a program that I<includes> the former remote module:
+
+  $ cat -n include.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $host = $ENV{GRID_REMOTE_MACHINE} || 'user@remote.machine.es';
+     6
+     7  my $machine = GRID::Machine->new( host => $host);
+     8
+     9  $machine->include(shift() || "Include");
+    10
+    11  for my $method (qw(one two three four five six)) {
+    12    if ($machine->can($method)) {
+    13      print $machine->host." can do $method\n";
+    14      print $machine->$method();
+    15    }
+    16  }
+
+
+When executed the former program produces an output like:
+ 
+  $ include.pl
+  user@remote.machine.es can do one
+  sub one
+  user@remote.machine.es can do two
+  sub two
+  user@remote.machine.es can do three
+  sub three
+
+
+=head3 The C<use> and C<LOCAL> directives in Remote Modules
+
+Two directives that can be used isinde a I<Remote Module> are C<use> and
+C<LOCAL>:
+
+=over 2
+
+=item *
+A C<use> pragma inside a I<Remote Module> indicates that such module will be loaded
+onto the remote machine.
+
+=item *
+A C<LOCAL { code }> directive inside a I<Remote Module> wraps C<code> that 
+will be executed on the local machine. C<LOCAL> directives can be used to massively
+load subroutines as in the example below.
+
+=back
+
+The following remote module contains a C<use> pragma in line 2. The call to 
+C<include> will load C<List::Util> on the remote machine and will import
+the C<sum> function.
+
+  $ cat -n Include4.pm
+     1  use strict;
+     2  use List::Util qw(sum); # List::Util will be loaded on the Remote Side
+     3
+     4  sub sigma {
+     5    sum(@_);
+     6  }
+     7
+     8  LOCAL {
+     9    print "Installing new functions\n";
+    10    for (qw(r w e x z s f d  t T B M A C)) {
+    11      SERVER->sub( "$_" => qq{
+    12          my \$file = shift;
+    13
+    14          return -$_ \$file;
+    15        }
+    16      );
+    17    }
+    18  }
+
+
+Lines 9-17 are surrounded by a C<LOCAL> directive and thus they will be executed
+on the local side. The effect is to install new methods for the C<GRID::Machine>
+object that will be equivalent to the classic Perl file tests: C<-r>, C<-w>, etc.
+Inside a C<LOCAL> directive the function C<SERVER> returns a reference 
+to the current C<GRID::Machine> object (see line 11).
+
+See a program that loads the former I<Remote Module>:
+
+  $ cat -n include4.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $host = $ENV{GRID_REMOTE_MACHINE} || 'user@remote.machine.es';
+     6
+     7  my $machine = GRID::Machine->new(host => $host,);
+     8
+     9  $machine->include(shift() || "Include4");
+    10
+    11  print "1+..+5 = ".$machine->sigma( 1..5 )->result."\n";
+    12
+    13  $machine->put([$0]);
+    14
+    15  for my $method (qw(r w e x s t f d)) {
+    16    if ($machine->can($method)) {
+    17      my $r = $machine->$method('include4.pl')->result || "";
+    18      print $machine->host."->$method( include4.pl ) = <$r>\n";
+    19    }
+    20  }
+
+
+When executed the program produces an output like:
+
+  $ include4.pl
+  Installing new functions
+  1+..+5 = 15
+  user@remote.machine.es->r( include4.pl ) = <1>
+  user@remote.machine.es->w( include4.pl ) = <1>
+  user@remote.machine.es->e( include4.pl ) = <1>
+  user@remote.machine.es->x( include4.pl ) = <1>
+  user@remote.machine.es->s( include4.pl ) = <498>
+  user@remote.machine.es->t( include4.pl ) = <>
+  user@remote.machine.es->f( include4.pl ) = <1>
+  user@remote.machine.es->d( include4.pl ) = <>
+
+=head2 The C<GRID::Machine::Core> Class 
+
+The following functions defined in the Remote Module C<GRID::Machine::Core> are loaded
+via the C<include> mechanism on the remote machine. Therefore, they work as methods of the
+C<GRID::Machine> object on the local machine.
+
+=head3 Function C<getcwd>
+
+=head3 Function C<chdir>
+
+=head3 Function C<umask>
+
+=head3 Function C<mkdir>
+
+=head3 Function C<system>
+
+=head3 Function C<glob>
+
+=head3 Function C<tar>
+
+=head3 Function C<version>
+
+Syntax:
+
+              $machine->version('Some::Module')
+
+Returns the VERSION of the module if the given module is installed on the remote machine
+and has a VERSION number.
+See an example of use:
+
+  $ cat version.pl
+  #!/usr/bin/perl -w
+  use strict;
+  use GRID::Machine;
+  use Data::Dumper;
+
+  my $host = $ENV{GRID_REMOTE_MACHINE} ||shift;
+
+  my $machine = GRID::Machine->new(host => $host,);
+
+  print Dumper($machine->version('Data::Dumper'));
+  print Dumper($machine->version('Does::Not::Exist::Yet'));
+
+When executed the program produces an  output similar to this:
+
+  $ version.pl
+  $VAR1 = bless( {
+                   'stderr' => '',
+                   'errmsg' => '',
+                   'type' => 'RETURNED',
+                   'stdout' => '',
+                   'errcode' => 0,
+                   'results' => [ '2.121_08' ]
+                 }, 'GRID::Machine::Result' );
+  $VAR1 = bless( {
+                   'stderr' => 'Can\'t locate Does/Not/Exist/Yet.pm in @INC \
+                                (@INC contains: /etc/perl /usr/local/lib/perl/5.8.8 ...
+                                BEGIN failed--compilation aborted.
+                               ',
+                   'errmsg' => '',
+                   'type' => 'RETURNED',
+                   'stdout' => '',
+                   'errcode' => 0,
+                   'results' => [ '' ]
+                 }, 'GRID::Machine::Result' );
+
+
+=head3 Function C<installed>
+
+Syntax:
+
+              $machine->installed('Some::Module')
+
+Returns TRUE if the given module is installed on the remote machine.
+
+
+=head1 ON THE REMOTE SIDE
+
+=head2 The Structure of the Remote Server
+
+As with most servers, the server side of the C<GRID::Machine> object consists of an infinite
+loop waiting for requests:
+
+  while( 1 ) {
+     my ( $operation, @args ) = $server->read_operation();
+
+     if ($server->can($operation)) {
+       $server->$operation(@args);
+       next;
+     }
+
+     $server->send_error( "Unknown operation $operation\nARGS: @args\n" );
+  }
+
+=head2 The Protocol
+
+The protocol simply consists of the name of the method to execute and the arguments
+for such method. The programmer - using inheritance - can extend the protocol
+with new methods (see the section L<EXTENDING THE PROTOCOL>). The following 
+operations are currently supported:
+
+=over 2
+
+=item * C<GRID::Machine::EVAL>
+
+Used by the local method C<eval>
+
+=item * C<GRID::Machine::STORE>
+
+Used by the local methods C<compile> and C<sub> to install code on the remote side.
+
+=item * C<GRID::Machine::EXISTS>
+
+Used by the local method C<exists>
+
+=item * C<GRID::Machine::CALL>
+
+Used by the local method C<call>
+
+=item * C<GRID::Machine::MODPUT>
+
+Used by the C<modput> method. A list of pairs (C<Module::Name, code for Module::Name>) is sent to the remote machine.
+For each pair, the remote side writes to disk a file C<Module/Name.pm> with the contents of the string 
+C<code for Module::Name>. The file is stored in the directory referenced by the C<prefix> attribute 
+of the C<GRID::Machine> object.
+
+
+=item * C<GRID::Machine::QUIT>
+
+Usually is automatically called when the C<GRID::Machine> object
+goes out of scope 
+
+=back 
+
+=head2 The C<SERVER> function
+
+The C<SERVER> function is available on the remote machine. Returns
+the object representing the remote side of the C<GRID::Machine> object.
+This way code on the remote side can gain access to the C<GRID::Machine> 
+object. See an example:
+
+    my $m = GRID::Machine->new( host => 'beowulf');
+
+    $m->sub(installed => q { return  keys %{SERVER->stored_procedures}; });
+    my @functions = $m->installed()->Results;
+    local $" = "\n";
+    print "@functions\n";
+
+The C<stored_procedures> method returns a reference to the hash containing
+the subroutines installed via the C<sub> and C<compile> methods. The keys are
+the names of the subroutines, the values are the C<CODE> references implementing
+them.  When executed the former program produces the list of installed subroutines:
+
+                    $ accessobject.pl
+                    tar
+                    uname
+                    system
+                    installed
+                    getcwd
+                    etc.
+
+=head2 The C<read_operation> Method 
+
+Syntax:
+
+     my ( $operation, @args ) = $server->read_operation( );
+
+Reads from the link. Returns the type of operation/tag and the results of the 
+operation.
+
+=head2 The C<send_operation> Method 
+
+Syntax:
+
+	  $server->send_operation( $OPERATION, @results );
+
+Writes to the communication C<ssh> link the type of operation and the 
+C<results>. It is responsible of marshalling C<results>.
+
+=head2 The C<send_error> Method 
+
+Syntax:
+
+     $server->send_error( "Error message" );
+
+Inside code to be executed on the remote machine we can use the function
+C<send_error> to send  error messages to the client
+
+=head2 The C<send_result> Method
+
+Syntax:
+
+    $server->send_result( 
+	stdout  => $stdout,
+	stderr  => $stderr,
+        errmsg  => $errmsg,
+        results => [ @results ],
+    );
+
+Inside code to be executed on the remote machine we can use the function
+C<send_result> to send  results to the client
+
+=head1 EXTENDING THE PROTOCOL
+
+To extend the protocol we have two write a pair of mirror-side modules. One will run on the local
+machine and the other on the remote machine. Let us see a simple example. We will extend the
+protocol with a new tag C<MYTAG>. First comes the local component of the pair:
+
+  $ cat -n MyLocal.pm
+     1  package MyMachine;
+     2  use base GRID::Machine;
+     3  use strict;
+     4
+     5  sub myrequest {
+     6     my $self = shift;
+     7     my $name = shift;
+     8
+     9     $self->send_operation( "MyMachine::MYTAG", $name );
+    10
+    11     my ($type, $result) = $self->read_operation();
+    12     return $result if $type eq "RETURNED";
+    13     return;
+    14  }
+    15
+    16  1;
+
+
+The module inherits from C<GRID::Machine>. 
+The method C<myrequest> will be used by local objects to request a communication
+with such tag.  Actually, I<the tag is the name of the remote method that will handle
+this request>. 
+The C<myrequest> method receives the C<MyMachine> object followed by any data to be sent.
+The methods C<send_operation> and C<read_operation> (in module L<GRID::Machine::Message>)
+provide the infrastructure for sending and receiving pure Perl data structures. 
+
+Observe the use of the full name of the method handling this tag in line 9. 
+When extending the protocol use always the full specification of the subroutine.
+This way has also the benefit of avoiding tag collisions between different modules
+extending C<GRID::Machine>.
+
+This is the remote component of the pair:
+
+  $ cat -n MyRemote.pm
+     1  package MyMachine;
+     2  our @ISA = qw(GRID::Machine);
+     3  use strict;
+     4
+     5  sub MYTAG {
+     6    my ($server, $name) = @_;
+     7
+     8    $server->send_operation("RETURNED", "Hello $name!\n") if defined($name);
+     9    $server->send_operation("DIED", "Error: Provide a name to greet!\n");
+    10  }
+    11
+    12  1;
+
+This component will be loaded on the remote machine via the ssh link. The remote side 
+of the module C<GRID::Machine> was already loaded when this module arrived. In fact, modules
+loaded this way are never written to disk on the remote side. Therefore, any attempt
+to substitute line 2 by C<use base GRID::Machine> will fail.
+
+The method C<MYTAG> is the remote partner of the local method C<myrequest>. The name of this method
+must be the same than the name of the tag (operation type) used to send the request 
+(local method C<myrequest>, line 9). 
+
+And last, here is a client program using the new tag:
+
+  $ cat -n extendprotocol.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use MyLocal;
+     4
+     5  my $name = shift;
+     6  my $host = 'user@remote.machine.domain';
+     7
+     8  my $machine = MyMachine->new(host => $host, remotelibs => [ qw(MyRemote) ]);
+     9
+    10  $machine->send_operation( "MYTAG", $name);
+    11  my ($type, $result) = $machine->read_operation();
+    12
+    13  die $result unless $type eq 'RETURNED';
+    14  print $result;
+
+
+When the program is executed we get the following output:
+
+                          $ extendprotocol.pl Larry
+                          Hello Larry!
+                          $ extendprotocol.pl
+                          Error: Provide a name to greet!
+
+=head1 THE C<GRID::Machine::Result> CLASS
+
+The class C<GRID::Machine::Result> is used by both the local and remote
+sides of the C<GRID::Machine>, though most of its methods are called 
+on the remote side. You can skip this section unless you are interested in 
+extending the protocol (see section L<EXTENDING THE PROTOCOL>).
+
+The result of a RPC is a C<GRID::Machine::Result> object. 
+Such object has the following attributes:
+
+=over 2
+
+=item * I<type>
+
+The C<type> of result returned. A string. fixed by the protocol.
+Common values are C<RETURNED> and C<DIED>.
+
+=item * I<stdout>
+
+A string containing the contents of C<STDOUT>
+produced during the duration of the RPC
+
+=item * I<stderr>
+
+A string containing the contents of C<STDERR>
+produced during the duration of the RPC
+
+=item * I<results>
+
+A reference to an C<ARRAY> containing the results returned by the RPC
+
+=item * I<errcode>
+
+The contents of C<$?> as produced during the RPC
+
+=item * I<errmsg>
+
+The contents of C<$@> as produced during the RPC
+
+=back
+
+=head2 The Constructor C<new>
+
+Syntax:
+
+  GRID::Machine::Result->new(
+    stdout => $rstdout, 
+    errmsg  => $err, 
+    stderr => $rstderr, 
+    results => \@results
+  )
+
+Builds a new result object.  
+
+=head2 The C<ok> Method
+
+Returns C<TRUE> if the RPC didn't died, i.e. if the C<type> attribute is not
+the string C<'DIED'>
+
+=head2 The C<result> Method
+
+Returns the first element of the list referenced by the C<results> attribute
+
+=head2 The C<Results> Method
+
+Returns the list referenced by the C<results> attribute
+
+=head2 The C<str> Method. Stringification of a C<Result> object
+
+Returns the string made of concatenating C<stdout>, C<stderr> and C<errmsg>.
+The Perl operator C<q("")> is overloaded using this method. Thus,
+wherever a C<GRID::Machine::Result> object is used on a scalar string 
+context the C<str> will be called.
+
+=head1 THE C<GRID::Machine::Message> CLASS
+
+This class is used by both the local and the remote sides of the
+C<GRID::Machine>. It implements the low level communication 
+layer. It is responsible of marshalling the data.
+Unless you are extending the protocol tehre is no
+need to directly access the methods introduced in this section.
+
+=head2 The C<read_operation> Method
+
+Syntax:
+
+   my ( $operation, @args ) = $server->read_operation( );
+
+Returns the kind of operation and the data sent by the other
+side of the SSH link.
+
+=head2 The C<send_operation> Method
+
+Examples:
+
+  $server->send_operation("RETURNED", GRID::Machine::Result->new( %arg ));
+
+  $server->send_operation("DIED", GRID::Machine::Result->new( 
+                                    errmsg  => "$server->{host}: $message")
+  );
+
+  $server->send_operation("RETURNED", exists($server->{stored_procedures}{$name}));
+
+
+Sends to other side of the link the C<type> of the message and the arguments.
+It uses L<Data::Dumper> to serialize the data structures.
+
+=head1 EXAMPLE: RUNNING DISTRIBUTION TESTS ON REMOTE MACHINES
+
+The following script C<examples/remotetest.pl> loads a CPAN distribution
+on a set of remote machines and run the tests on each of them:
+
+      $ examples/remotetest.pl GRID-Machine-0.07.tar.gz orion
+      ************orion************
+      Writing Makefile for GRID::Machine
+      Warning: prerequisite Module::Which 0.0205 not found.
+
+Here are the contents:
+
+  $ cat -n examples/remotetest.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $dist = shift or die "Usage:\n$0 distribution.tar.gz machine1 machine2 ... \n";
+     6
+     7  die "No distribution $dist found\n" unless -r $dist;
+     8
+     9    die "Distribution does not follow standard name convention\n"
+    10  unless $dist =~ m{([\w.-]+)\.tar\.gz$};
+    11  my $dir = $1;
+    12
+    13  die "Usage:\n$0 distribution.tar.gz machine1 machine2 ... \n" unless @ARGV;
+    14  for my $host (@ARGV) {
+    15    my $m = GRID::Machine->new(host => $host, startdir => '/tmp');
+    16
+    17    $m->put([$dist]);
+    18
+    19    $m->tar($dist, '-xz')->ok or do {
+    20      warn "$host: Can't extract files from $dist\n";
+    21      next;
+    22    };
+    23
+    24    $m->chdir($dir)->ok or do {
+    25      warn "$host: Can't change to directory $dir\n";
+    26      next;
+    27    };
+    28
+    29    print "************$host************\n";
+    30    next unless $m->run('perl Makefile.PL');
+    31    next unless $m->run('make');
+    32    next unless $m->run('make test');
+    33  }
+
+
+
+=head1 LIMITATIONS
+
+=head2 X Forwarding
+
+X forwarding via C<ssh -X > does not work. C<GRID::Machine> uses C<open2> (see L<IPC::Open2>)
+to set the connection and share its limitations. The following program produces an error:
+
+    use GRID::Machine qw(is_operative);
+    use Data::Dumper;
+
+    my $host = 'user@remote.machine.domain';
+
+    my $machine = GRID::Machine->new(host => $host, ssh => 'ssh -X');
+
+    print $machine->eval(q{ system('xclock &') });
+
+When we execute it we get this message:
+
+  $ xclock.pl
+  Warning: No xauth data; using fake authentication data for X11 forwarding.
+  Can't exec "ssh -X": File or dir does not exists at /usr/share/perl/5.8/IPC/Open3.pm line 168.
+  open2: exec of ssh -X user@remote.machine.domain perl failed at \
+             /home/pp2/LGRID_Machine/lib/GRID/Machine.pm line 168
+
+=head2 Opaque Structures
+
+The RPC provided by C<GRID::Machine> uses L<Data::Dumper> to serialize 
+the data. It consequently suffers the same limitations than L<Data::Dumper>.
+
+Namely, I<Opaque structures> like those built by modules written using 
+external languages like C
+I<can't be correctly transferred> by the RPC system provided by C<GRID::Machine>. 
+An example is the transference
+of PDL objects (see L<PDL>). In such cases, the programmer must
+transform (i.e. marshalling or project) the structure into a (linear)
+string on one
+side and rebuild (uplift) the (multidimensional) structure from the string
+on the other side. See an example:
+
+    use GRID::Machine;
+    use PDL;
+    use PDL::IO::Dumper;
+
+    my $host = shift || 'user@remote.machine.domain';
+
+    my $machine = GRID::Machine->new(host => $host, uses => [qw(PDL PDL::IO::Dumper)]);
+
+    my $r = $machine->sub( mp => q{
+        my ($f, $g) = @_;
+
+        my $h = (pdl $f) x (pdl $g);
+
+        sdump($h);
+      },
+    );
+    $r->ok or die $r->errmsg;
+
+    my $f = [[1,2],[3,4]];
+    $r = $machine->mp($f, $f);
+    die $r->errmsg unless $r->ok;
+    my $matrix =  eval($r->result);
+    print "\$matrix is a ".ref($matrix)." object\n";
+    print "[[1,2],[3,4]] x [[1,2],[3,4]] = $matrix";
+
+Here the C<sdump> method of L<PDL::IO::Dumper> solves the problem: it
+gives a string representation of the C<PDL> object that is C<eval>ued
+later to have the matrix data structure.
+When executed this program produces the following output:
+
+            $ uses.pl
+            $matrix is a PDL object
+            [[1,2],[3,4]] x [[1,2],[3,4]] =
+            [
+             [ 7 10]
+             [15 22]
+            ]
+
+=head3 Wish List
+
+It will benefit this module f we have a more OOP oriented C<Data::Dumper>
+so that if the objet being dumped is I<opaque> but has a C<Dumper> 
+method, such method will be called. The idea being that anyone
+developing some sort of external object (C, XS, etc.) will collaboratively
+define a C<Dumper> method specifying how the object will be dumped.
+That can be a goal to fulfill.
+  
+=head2 Call by Reference
+
+Remote Subroutine Call I<by reference> is not supported in this version. 
+See the following example:
+
+      use GRID::Machine;
+
+      my $machine = GRID::Machine->new(
+            host => 'user@remote.machine.domain',
+            startdir => '/tmp',
+         );
+
+      my $r = $machine->sub(byref => q{ $_[0] = 4; });
+      die $r->errmsg unless $r->ok;
+
+      my ($x, $y) = (1, 1);
+
+      $y = $machine->byref($x)->result;
+
+      print "$x, $y\n"; # 1, 4
+
+Observe that variable C<$x> is not modified. The only way to modify a variable on the local side
+by a remote subroutine is I<by result>, like is done for C<$y> in the previous example.
+
+=head2 Limitations of the C<include> Method
+
+The C<include> parses Perl code.  It is a one page length parser (72 lines at the moment
+of writing). It obviously can't parse everything. But works for most of the code.
+
+=head1 EXPORTS
+
+When explicited by the client program it exports these functions:
+
+=over 2
+
+=item * C<is_operative> 
+
+=item * C<read_modules>
+
+=back
+
+=head1 SEE ALSO
+
+=over 2
+
+=item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/Machine.dvi>
+
+=item * L<IPC::PerlSSH>
+
+=back
+=head1 AUTHOR
+
+Casiano Rodriguez Leon E<lt>casiano@ull.esE<gt>
+
+=head1 ACKNOWLEDGMENTS
+
+This work has been supported by CEE (FEDER) and the Spanish Ministry of
+I<Educación y Ciencia> through I<Plan Nacional I+D+I> number TIN2005-08818-C04-04
+(ULL::OPLINK project L<http://www.oplink.ull.es/>). 
+Support from Gobierno de Canarias was through GC02210601
+(I<Grupos Consolidados>).
+The University of La Laguna has also supported my work in many ways
+and for many years.
+
+I wish to thank Paul Evans for his C<IPC::PerlSSH> module: it was the source
+of inspiration for this module. 
+Thanks also to Juana, Coro, my students at La Laguna and to the Perl Community. 
+
+=head1 LICENCE AND COPYRIGHT
+ 
+Copyright (c) 2007 Casiano Rodriguez-Leon (casiano@ull.es). All rights reserved.
+
+These modules are free software; you can redistribute it and/or
+modify it under the same terms as Perl itself. See L<perlartistic>.
+ 
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+
+

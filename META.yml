@@ -1,0 +1,14 @@
+--- #YAML:1.0
+name:                GRID-Machine
+version:             0.07
+abstract:            Remote Procedure Calls over a SSH link
+license:             ~
+generated_by:        ExtUtils::MakeMaker version 6.31
+distribution_type:   module
+requires:     
+    Module::Which:                 0.0205
+meta-spec:
+    url:     http://module-build.sourceforge.net/META-spec-v1.2.html
+    version: 1.2
+author:
+    - Casiano Rodriguez-Leon <casiano@ull.es>
