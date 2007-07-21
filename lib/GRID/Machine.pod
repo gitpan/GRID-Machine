@@ -81,9 +81,74 @@ between machines
 
 To install this module, follow these two steps:
 
-=over
+=over 2
 
-=item  * Set automatic ssh-authentification with a machine where you have an account
+=item  * Set automatic ssh-authentification with a machine where you have an account.
+
+SSH includes the ability to authenticate users using public keys. Instead of 
+authenticating the user with a password, the SSH server on the remote machine will
+verify a challenge signed by the user's I<private key> against its copy
+of the user's I<publick key>. To achieve this automatic ssh-authentification
+you have to:
+
+=over 2
+
+=item * Generate a public key use the C<ssh-keygen> utility. For example:
+
+  $ ssh-keygen -t rsa -N ''
+
+The option C<-t> selects the type of key you want to generate.
+There are three types of keys: I<rsa1>, I<rsa> and I<dsa>.
+The C<-N> option is followd by the I<passphrase>. The C<-N ''> setting
+indicates that no pasphrase will be used. This is useful when used 
+with key restrictions or when dealing with cron jobs, batch 
+commands and automatic processing which is the context in which this 
+module was designed.
+If still you don't like to have a private key without passphrase, 
+provide a passphrase and use C<ssh-agent> 
+to avoid the inconvenience of typing the passphrase each time. 
+C<ssh-agent> is a program you run once per login sesion and load your keys into.
+From that moment on, any C<ssh> client will contact C<ssh-agent>
+and no more passphrase typing will be needed.
+
+By default, your identification will be saved in a file C</home/user/.ssh/id_rsa>.
+Your public key will be saved in C</home/user/.ssh/id_rsa.pub>.
+
+=item * Once you have generated a key pair, you must install the public key on the 
+remote machine. To do it, append the public component of the key C</home/user/.ssh/id_rsa.pub>
+to the C<home/user/.ssh/authorized_keys> file on the remote machine.
+If the C<ssh-copy-id> script is available, you can do it using:
+
+  $ ssh-copy-id -i ~/.ssh/id_rsa.pub user@machine1
+
+Alternatively you can write the following command:
+
+  $ ssh remote.machine "umask 077; cat >> .ssh/authorized_keys" < home/user/.ssh/id_rsa.pub
+
+The C<umask> command is needed since the SSH server will refuse to 
+read a C<home/user/.ssh/authorized_keys> files which have loose permissions.
+
+=item * Once the public key is installed on the server you should be able to
+authenticate using your private key
+
+  $ ssh remote.machine
+  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686
+  Last login: Sat Jul  7 13:34:00 2007 from local.machine
+  user@remote.machine:~$                                 
+
+=item * Edit your local C</home/.ssh/config> file and add lines like:
+
+ Host remote.machine
+ user my_login_in_the_remote_machine
+
+ Host another.remote.machine an.alias.for.this.machine
+ user mylogin_there
+
+This way you don't have to specify your I<login> name on the remote machine even if it
+differs from your  I<login> name in the local machine.
+
+=back
+
 
 =item  * Before running the tests. Set on the local machine the environment variable 
 C<GRID_REMOTE_MACHINE> to point to a machine that is available using automatic authenticatication. 
@@ -1747,6 +1812,12 @@ Here are the contents:
 
 =head1 LIMITATIONS
 
+=head2 Operating System
+
+I will be surprised if this module works on anything that is not
+ UNIX.
+
+
 =head2 X Forwarding
 
 X forwarding via C<ssh -X > does not work. C<GRID::Machine> uses C<open2> (see L<IPC::Open2>)
@@ -1879,6 +1950,11 @@ When explicited by the client program it exports these functions:
 =item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/Machine.dvi>
 
 =item * L<IPC::PerlSSH>
+
+=item * Man pages of C<ssh>, C<ssh-key-gen>, C<ssh_config>, C<scp>, 
+C<ssh-agent>, C<ssh-add>, C<sshd>
+
+=item * L<http://www.openssh.com>
 
 =back
 
