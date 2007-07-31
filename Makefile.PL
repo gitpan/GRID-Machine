@@ -24,6 +24,8 @@ my @files = qw(
   lib/GRID/Machine/REMOTE.pm
   lib/GRID/Machine/Request.pm
   lib/GRID/Machine/Result.pm
+  lib/GRID/Machine/IOHandle.pm
+  lib/GRID/Machine/RIOHandle.pm
   examples/MyLocal.pm
   examples/MyRemote.pm
   examples/extendprotocol.pl

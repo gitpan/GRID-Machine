@@ -1,5 +1,10 @@
 * Documentation
 * Tests
+     rw-r--r--   1 casiano casiano            0 2007-07-21 13:10 rperl$$.log
+    -rw-r--r--   1 casiano casiano            0 2007-07-21 13:10 rperl$$.err
+
+* Method "call" must specify the context: if scalar or list. Important for IO.
+
 * Debug: put a field "debug" wich concatenates the debug info
     $m->debug("info: $info")
   It will be sent back to the client asap
@@ -14,6 +19,12 @@
      # O mejor:
      $/ = undef;
      $y = <$file>;
+
+  There is s.t. odd in the example. $/ = undef; occurs in local, so, it must be s.t. like:
+     $m->eval{ $/ = undef };
+     $y = <$file>;
+
+  But then we have the problem of locality.
 
   Tendriamos una lista de files en el remoto. En el local es un objeto que guarda,
   la máquina (GRID::Machine), el indice de la lista, etc.. La llamada a

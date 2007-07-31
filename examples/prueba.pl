@@ -2,7 +2,7 @@
 use strict;
 use GRID::Machine;
 
-my $machine = shift || 'orion.pcg.ull.es';
+my $machine = shift || $ENV{GRID_REMOTE_MACHINE};
 my $m = GRID::Machine->new( host => $machine );
 
 $m->eval( "use POSIX qw( uname )" );

@@ -73,5 +73,5 @@ sub version {
 sub installed {
   my $module = shift;
 
-  !system("$^X -M$module -e 0");
+  !CORE::system("$^X -M$module -e 0");
 }

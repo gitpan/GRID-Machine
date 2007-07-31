@@ -13,6 +13,7 @@ use IPC::Open2;
 use Carp;
 use File::Spec;
 use base qw(Exporter);
+use GRID::Machine::IOHandle;
 require Cwd;
 no Cwd;
 our @EXPORT_OK = qw(is_operative read_modules);
@@ -22,7 +23,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.072";
+our $VERSION = "0.073";
 
 sub read_modules {
 
@@ -247,7 +248,10 @@ EOREMOTE
          unshift @{$misa}, 'GRID::Machine'
      unless first { $_ eq 'GRID::Machine' } @{$misa};
 
+     # Allow the user to include their own
      $self->include('GRID::Machine::Core');
+     $self->include('GRID::Machine::RIOHandle');
+
      return $self;
   }
 } # end of closure
@@ -256,7 +260,7 @@ sub _get_result {
   my $self = shift;
 
   my ($type, $result) = $self->read_operation();
-  $result->type($type) if blessed($result);
+  $result->type($type) if blessed($result) and $result->isa('GRID::Machine::Result');
   
   return $result; # void context
 }
@@ -604,6 +608,16 @@ sub module_transfer {
   $self->chdir($olddir);
 }
 
+sub open {
+  my ($self, $descriptor) = @_;
+
+  $self->send_operation( "GRID::Machine::OPEN", $descriptor );
+
+  my $index = $self->_get_result()->result;
+
+  return bless { index => $index, server => $self }, 'GRID::Machine::IOHandle';
+}
+
 sub DESTROY {
    my $self = shift;
 
@@ -621,4 +635,3 @@ sub DESTROY {
 
 1;
 
-__END__

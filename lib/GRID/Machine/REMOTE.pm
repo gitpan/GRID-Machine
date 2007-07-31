@@ -5,6 +5,7 @@ use Data::Dumper;
 use List::Util qw(first);
 use Scalar::Util qw(blessed);
 use Cwd;
+use IO::File;
 use File::Spec;
 
 $| = 1;
@@ -142,6 +143,7 @@ sub send_result {
       cleanup  => $cleanup,
       prefix   => $prefix,
       clientpid => $clientpid, 
+      FILES     => [],
 
       stored_procedures => {},
     };
@@ -257,6 +259,7 @@ sub STORE {
 
   my %args = @_;
   my $politely = $args{politely} || 0; 
+  delete($args{politely});
 
   my $subref = eval qq{ sub { use strict; $code } };
   if( $@ ) {
@@ -271,7 +274,8 @@ sub STORE {
     );
   }
   else {
-    $server->{stored_procedures}{$name} = $subref;
+    # Store a Remote Subroutine Object
+    $server->{stored_procedures}{$name} = GRID::Machine::RemoteSub->new(sub => $subref, %args);
     $server->send_result( 
         results => [ 1 ],
     );
@@ -289,7 +293,7 @@ sub EXISTS {
 sub CALL {
   my ($server, $name, $args) = @_;
 
-  my $subref = $server->{stored_procedures}{$name};
+  my $subref = $server->{stored_procedures}{$name}->{sub};
   if( !defined $subref ) {
      $server->send_error( "Error in RPC. No such stored procedure '$name'" );
      return;
@@ -307,6 +311,8 @@ sub CALL {
      return;
   }
 
+  my $filter = $server->{stored_procedures}{$name}->filter;
+  $results = $results->$filter if $filter;
   $server->send_operation( "RETURNED", $results );
   return;
 }
@@ -343,6 +349,24 @@ sub MODPUT {
   return;
 }
 
+sub OPEN {
+  my ($server, $descriptor) = splice @_,0,2;
+
+  my $file = IO::File->new();
+  unless (defined($descriptor) and $file->open($descriptor)) {
+     $server->send_error("Error while opening $descriptor. $@");
+     return;
+  }
+
+  my $files = $server->{FILES};
+  push @{$files}, $file; # Watch memory usage
+
+  $server->send_result( 
+      results => [ $#$files ],
+  );
+  return;
+}
+
 sub DESTROY {
   my $self = shift;
 
@@ -369,3 +393,19 @@ sub main() {
   }
 }
 
+package GRID::Machine::RemoteSub;
+
+{
+  my @legal = qw( sub filter );
+  my %legal = map { $_ => 1 } @legal;
+
+  GRID::Machine::MakeAccessors::make_accessors(@legal);
+
+  sub new {
+    my $class = shift;
+
+    bless { @_ }, $class;
+  }
+}
+
+1;

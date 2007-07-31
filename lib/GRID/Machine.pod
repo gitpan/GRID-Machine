@@ -714,12 +714,17 @@ Syntax:
 
                    $machine->compile( $name, $code )
                    $machine->compile( $name, $code, politely => $politely )
+                   $machine->compile( $name, $code, filter => $filter )
+                   $machine->compile( $name, $code, politely => $politely, filter => $filter )
 
 This method sends code to the remote host to store it inside the remote
 side of the C<GRID::Machine> object. Namely, the C<stored_procedures> 
 attribute of the remote object is a hash reference containing the stored 
 subroutines. The C<$code> is compiled into a C<CODE> reference which
 can be executed later through the C<call> method.
+
+The two first arguments are the name C<$name> of the subroutine and the 
+code C<$code>. The order of the other arguments is irrelevant.
 
 The subroutine name C<$name> must be an identifier, i. e. must match
 the regexp C<[a-zA-Z_]\w*>. Full names aren't allowed.
@@ -784,6 +789,7 @@ To avoid overwriting an existent function the C<exists> method can be used:
             my $r= $m->call("one");
             print $r; # prints "one"
 
+=head3 The C<politely> argument
 
 an alternative solution is to use the C<politely> argument of C<compile>. 
 If true the function won't be
@@ -812,12 +818,16 @@ When executed, the former program produces this output:
     Warning! Attempt to overwrite sub 'one'. New version was not installed.
     one
 
+
+
 =head2 The C<sub> Method
 
 Syntax:
 
                     $machine->sub( $name, $code )
                     $machine->sub( $name, $code, politely => $politely )
+                    $machine->sub( $name, $code, filter => $filter )
+                    $machine->sub( $name, $code, filter => $filter, politely => $politely )
 
 This method is identical to the C<compile> method, except that the remote
 C<$code> will be available as a (singleton) 
@@ -826,6 +836,73 @@ program. Therefore, two methods of two different C<GRID::Machine> objects with
 the same C<$name> are installed on different name spaces. See the example
 in section
 L<the constructor C<new>|"The Constructor new">
+
+=head3 The C<filter> Argument
+
+By default, the result of a subroutine call is a C<GRID::Machine::Result> object.
+However, for a given subroutine this behavior can be changed using the C<filter>
+argument. Thus, the subroutine C<filter_results> installed in lines 12-15
+of the code below, when called returns the C<results> attribute instead of the
+whole  C<GRID::Machine::Result> object. The subroutine C<filter_result> installed in lines 17-20
+returns the first element of the resulting list:
+
+  $ cat -n filter.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  use Data::Dumper;
+     5
+     6  my $machine = GRID::Machine->new( host => 'casiano@orion.pcg.ull.es',);
+     7
+     8  $machine->sub(
+     9    nofilter => q{ map { $_*$_ } @_ },
+    10  );
+    11
+    12  $machine->sub(
+    13    filter_results => q{ map { $_*$_ } @_ },
+    14    filter => 'results'
+    15  );
+    16
+    17  $machine->sub(
+    18    filter_result => q{ map { $_*$_ } @_ },
+    19    filter => 'result',
+    20  );
+    21
+    22  my @x = (3..5);
+    23  my $content = $machine->nofilter(@x);
+    24  print Dumper($content);
+    25
+    26  $content = $machine->filter_results(@x);
+    27  print Dumper($content);
+    28
+    29  $content = $machine->filter_result(@x);
+    30  print Dumper($content);
+
+When executed the former program produces this output:
+
+  $ filter.pl
+  $VAR1 = bless( {
+                   'stderr' => '',
+                   'errmsg' => '',
+                   'type' => 'RETURNED',
+                   'stdout' => '',
+                   'errcode' => 0,
+                   'results' => [ 9, 16, 25 ]
+                 }, 'GRID::Machine::Result' );
+  $VAR1 = [ 9, 16, 25 ];
+  $VAR1 = 9;
+
+In general, the result of a call to a subroutine installed using
+
+                    $machine->sub( $name, $code, filter => $filter )
+
+will apply the C<$filter> subroutine to the C<GRID::Machine::Result> object resulting
+from the call. The filter C<$filter> must be a C<GRID::Machine::Result> method
+and must return a scalar.
+
+The usage of the C<results> and C<result> filters can be convenient
+when the programmer isn't interested in the other attributes i.e. C<stdout>, 
+C<stderr>, etc.
 
 =head2 The C<call> Method
 
@@ -1761,6 +1838,64 @@ Examples:
 Sends to other side of the link the C<type> of the message and the arguments.
 It uses L<Data::Dumper> to serialize the data structures.
 
+=head1 REMOTE INPUT/OUTPUT
+
+C<GRID::Machine> objects have the C<open> method.
+The C<open> method returns a  L<GRID::Machine::IOHandle> object.
+Such objects very much behave as L<IO::Handle> objects but instead
+they refer to handles and files on the associated machine.
+See a simple example:
+
+  use GRID::Machine;
+
+  my $machine = shift || 'remote.machine';
+  my $m = GRID::Machine->new( host => $machine );
+
+  my $f = $m->open('> tutu.txt'); # Creates a GRID::Machine::IOHandle object
+  $f->print("Hola Mundo!\n");
+  $f->print("Hello World!\n");
+  $f->printf("%s %d %4d\n","Bona Sera Signorina", 44, 77);
+  $f->close();
+
+  $f = $m->open('tutu.txt');
+  my $x = <$f>;
+  print "\n******diamond scalar********\n$x\n";
+  $f->close();
+
+  $f = $m->open('tutu.txt');
+  my $old = $m->input_record_separator(undef);
+  $x = <$f>;
+  print "\n******diamond scalar context and \$/ = undef********\n$x\n";
+  $f->close();
+  $old = $m->input_record_separator($old);
+
+A remote C<GRID::Machine::IOHandle> object is created through the call
+
+                   my $f = $m->open('> tutu.txt')
+
+from that moment on we can write in the file using the C<print> and C<printf> methods
+of C<GRID::Machine::IOHandle> objects.
+You can see later in the former code how the diamond operator can be called to read on a remote file:
+
+                             my $x = <$f>;
+
+When we run the former example we get an ouput similar to this:
+
+
+    $ synopsisiohandle.pl
+
+    ******diamond scalar********
+    Hola Mundo!
+
+
+    ******diamond scalar context and $/ = undef********
+    Hola Mundo!
+    Hello World!
+    Bona Sera Signorina 44   77
+
+See also the documentation in L<GRID::Machine::IOHandle> for more detailed 
+information.
+
 =head1 EXAMPLE: RUNNING DISTRIBUTION TESTS ON REMOTE MACHINES
 
 The following script C<examples/remotetest.pl> loads a CPAN distribution
@@ -1815,7 +1950,7 @@ Here are the contents:
 =head2 Operating System
 
 I will be surprised if this module works on anything that is not
- UNIX.
+UNIX.
 
 
 =head2 X Forwarding
@@ -1946,6 +2081,8 @@ When explicited by the client program it exports these functions:
 =head1 SEE ALSO
 
 =over 2
+
+=item * L<GRID::Machine::IOHandle>
 
 =item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/Machine.dvi>
 
