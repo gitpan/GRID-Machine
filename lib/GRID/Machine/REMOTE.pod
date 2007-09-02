@@ -1,0 +1,179 @@
+=head1 NAME
+
+GRID::Machine::REMOTE - The server that runs on the other side of the SSH link
+
+=head1 DESCRIPTION
+
+
+=head2 The Structure of the Remote Server
+
+As with most servers, the server side of the C<GRID::Machine> object consists of an infinite
+loop waiting for requests:
+
+  while( 1 ) {
+     my ( $operation, @args ) = $server->read_operation();
+
+     if ($server->can($operation)) {
+       $server->$operation(@args);
+       next;
+     }
+
+     $server->send_error( "Unknown operation $operation\nARGS: @args\n" );
+  }
+
+=head2 The Protocol
+
+The protocol simply consists of the name of the method to execute and the arguments
+for such method. The programmer - using inheritance - can extend the protocol
+with new methods (see the section L<EXTENDING THE PROTOCOL>). The following 
+operations are currently supported:
+
+=over 2
+
+=item * C<GRID::Machine::EVAL>
+
+Used by the local method C<eval>
+
+=item * C<GRID::Machine::STORE>
+
+Used by the local methods C<compile> and C<sub> to install code on the remote side.
+
+=item * C<GRID::Machine::EXISTS>
+
+Used by the local method C<exists>
+
+=item * C<GRID::Machine::CALL>
+
+Used by the local method C<call>
+
+=item * C<GRID::Machine::MODPUT>
+
+Used by the C<modput> method. A list of pairs (C<Module::Name, code for Module::Name>) is sent to the remote machine.
+For each pair, the remote side writes to disk a file C<Module/Name.pm> with the contents of the string 
+C<code for Module::Name>. The file is stored in the directory referenced by the C<prefix> attribute 
+of the C<GRID::Machine> object.
+
+
+=item * C<GRID::Machine::OPEN>
+
+Used by the C<open> method. As arguments receives a string
+defining the way the file will be accessed.
+
+=item * C<GRID::Machine::QUIT>
+
+Usually is automatically called when the C<GRID::Machine> object
+goes out of scope 
+
+=back 
+
+=head2 The C<SERVER> function
+
+The C<SERVER> function is available on the remote machine. Returns
+the object representing the remote side of the C<GRID::Machine> object.
+This way code on the remote side can gain access to the C<GRID::Machine> 
+object. See an example:
+
+    my $m = GRID::Machine->new( host => 'beowulf');
+
+    $m->sub(installed => q { return  keys %{SERVER->stored_procedures}; });
+    my @functions = $m->installed()->Results;
+    local $" = "\n";
+    print "@functions\n";
+
+The C<stored_procedures> method returns a reference to the hash containing
+the subroutines installed via the C<sub> and C<compile> methods. The keys are
+the names of the subroutines, the values are the C<CODE> references implementing
+them.  When executed the former program produces the list of installed subroutines:
+
+                    $ accessobject.pl
+                    tar
+                    system
+                    installed
+                    getcwd
+                    etc.
+
+=head2 The C<read_operation> Method 
+
+Syntax:
+
+     my ( $operation, @args ) = $server->read_operation( );
+
+Reads from the link. Returns the type of operation/tag and the results of the 
+operation.
+
+=head2 The C<send_error> Method 
+
+Syntax:
+
+     $server->send_error( "Error message" );
+
+Inside code to be executed on the remote machine we can use the function
+C<send_error> to send  error messages to the client
+
+=head2 The C<send_result> Method
+
+Syntax:
+
+    $server->send_result( 
+	stdout  => $stdout,
+	stderr  => $stderr,
+        errmsg  => $errmsg,
+        results => [ @results ],
+    );
+
+Inside code to be executed on the remote machine we can use the function
+C<send_result> to send  results to the client
+
+
+
+=head1 SEE ALSO
+
+=over 2
+
+=item * L<GRID::Machine>
+
+=item * L<GRID::Machine::IOHandle>
+
+=item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/Machine.dvi>
+
+=item * L<IPC::PerlSSH>
+
+=item * Man pages of C<ssh>, C<ssh-key-gen>, C<ssh_config>, C<scp>, 
+C<ssh-agent>, C<ssh-add>, C<sshd>
+
+=item * L<http://www.openssh.com>
+
+=back
+
+=head1 AUTHOR
+
+Casiano Rodriguez Leon E<lt>casiano@ull.esE<gt>
+
+=head1 ACKNOWLEDGMENTS
+
+This work has been supported by CEE (FEDER) and the Spanish Ministry of
+I<Educación y Ciencia> through I<Plan Nacional I+D+I> number TIN2005-08818-C04-04
+(ULL::OPLINK project L<http://www.oplink.ull.es/>). 
+Support from Gobierno de Canarias was through GC02210601
+(I<Grupos Consolidados>).
+The University of La Laguna has also supported my work in many ways
+and for many years.
+
+I wish to thank Paul Evans for his C<IPC::PerlSSH> module: it was the source
+of inspiration for this module. 
+Thanks also to Juana, Coro, my students at La Laguna and to the Perl Community. 
+
+=head1 LICENCE AND COPYRIGHT
+ 
+Copyright (c) 2007 Casiano Rodriguez-Leon (casiano@ull.es). All rights reserved.
+
+These modules are free software; you can redistribute it and/or
+modify it under the same terms as Perl itself. See L<perlartistic>.
+ 
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+
+
+
+

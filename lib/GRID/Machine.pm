@@ -23,7 +23,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.073";
+our $VERSION = "0.074";
 
 sub read_modules {
 
@@ -51,13 +51,6 @@ sub read_modules {
 
 #Warning: bug. host may be is not defined!!!!!!!!!!
 #
-my @Remote_modules = qw(
-  GRID::Machine::MakeAccessors
-  GRID::Machine::Message 
-  GRID::Machine::Result
-  GRID::Machine::REMOTE
-);
-
 { # closure for attributes
 
   my @legal = qw(
@@ -104,7 +97,7 @@ my \$rperl = $class->new(
   host => '$host',
   log  => '$log',
   err  => '$err',
-  clientpid => '$$',
+  clientpid => $$,
   startdir => '$startdir',
   startenv => { qw{ @$startenv } },
   pushinc => [ qw{ @$pushinc } ], 
@@ -134,6 +127,14 @@ EOREMOTE
      
      # The user can specify some libs that will be loaded at boot time
      my $remotelibs = $opts{remotelibs} || [];
+
+     my @Remote_modules = qw(
+       GRID::Machine::MakeAccessors
+       GRID::Machine::Message 
+       GRID::Machine::Result
+       GRID::Machine::REMOTE
+     );
+
      push @Remote_modules, $_ for @$remotelibs;
 
      my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -141,8 +142,8 @@ EOREMOTE
      my $host = "";
      my ( $readfunc, $writefunc ) = ( $opts{readfunc}, $opts{writefunc} );
 
-     my $log = $opts{log} || 'rperl$$.log';
-     my $err = $opts{err} || 'rperl$$.err';
+     my $log = $opts{log} || '';
+     my $err = $opts{err} || '';
      my $wait = $opts{wait} || 15;
      my $cleanup = $opts{cleanup};
      my $ssh = $opts{ssh} || 'ssh';

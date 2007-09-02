@@ -32,23 +32,29 @@ my @files = qw(
   examples/synopsis1.pl
 );
 return <<"EOT";
+doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
+	cd tt2; tpage  Machine.tt2 > ../lib/GRID/Machine.pod
+	cd tt2; tpage  Message.tt2 > ../lib/GRID/Machine/Message.pod
+	cd tt2; tpage  REMOTE.tt2 > ../lib/GRID/Machine/REMOTE.pod
+	cd tt2; tpage  Result.tt2 > ../lib/GRID/Machine/Result.pod
+
 pdf: @files
 	atopdf @files -o /tmp/gridmachine.pdf
 
-publicdist: dist
+publicdist: doc dist
 	chmod a+r GRID-Machine-*.tar.gz
-	cp GRID-Machine-0.07.tar.gz /home/pp2/public_html/perlexamples/
+	cp GRID-Machine-*.tar.gz /home/pp2/public_html/perlexamples/GRID-Machine.tar.gz
 
-xdvi: 
+xdvi: doc
 	pod2latex -full -prefile preamble.tex lib/GRID/Machine.pod
 	latex Machine
 	latex Machine
 	makeindex Machine; latex Machine.tex 
 
-html:
+html: doc
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine.pod
 
-publish: html xdvi
+publish: doc html xdvi
 	cp Machine.dvi /home/pp2/public_html/GRID_Machine/
 	cp Machine.html /home/pp2/public_html/GRID_Machine/
 EOT

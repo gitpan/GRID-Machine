@@ -115,10 +115,13 @@ sub send_result {
 
     # Create it if it does not exist? (the directories I mean)
     # What if it is absolute?
-    my $log = "$ENV{HOME}/$args{log}" || "$ENV{HOME}/rperl$clientpid.log";
+    
+    $args{log} = "rperl$clientpid.log" unless $args{log};
+    my $log = "$ENV{HOME}/$args{log}";
     open my $logfile, "> $log" or $die = 1;
 
-    my $err = "$ENV{HOME}/$args{err}" || "$ENV{HOME}/rperl$clientpid.err";
+    $args{err} = "rperl$clientpid.err" unless $args{err};
+    my $err = "$ENV{HOME}/$args{err}";
     open my $errfile, "> $err" or $die = 1;
 
     my $prefix = $args{prefix} || "$ENV{HOME}/perl5lib";

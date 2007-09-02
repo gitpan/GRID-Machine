@@ -4,7 +4,7 @@ use GRID::Machine;
 use Data::Dumper;
 
 my $machine = shift || 'orion.pcg.ull.es';
-my $m = GRID::Machine->new( host => $machine );
+my $m = GRID::Machine->new( host => $machine, cleanup => 0 );
 
 my $f = $m->open('> tutu.txt');
 $m->print($f, "Hola Mundo!\n");

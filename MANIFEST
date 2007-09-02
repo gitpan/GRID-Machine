@@ -18,6 +18,9 @@ lib/GRID/Machine/Message.pm
 lib/GRID/Machine/REMOTE.pm
 lib/GRID/Machine/Result.pm
 lib/GRID/Machine/RIOHandle.pm
+lib/GRID/Machine/Message.pod
+lib/GRID/Machine/REMOTE.pod
+lib/GRID/Machine/Result.pod
 examples/2machines.pl
 examples/accessobject.pl
 examples/alias.pl

@@ -43,7 +43,7 @@ GRID::Machine - Remote Procedure Calls over a SSH link
 =head1 DESCRIPTION
 
 This module is inspired in the L<IPC::PerlSSH> module by Paul Evans.
-This module provides Remote Procedure Calls
+It provides Remote Procedure Calls
 (RPC) via a SSH connection. What made L<IPC::PerlSSH> appealing to me
 was that 
 
@@ -213,7 +213,7 @@ The following example illustrates the point.
 
 There are two C<GRID::Machine> objects involved: C<$m> (for a connection to 
 a machine named C<orion>)
-and C<$p> (connection to a machuine named C<beowulf>) created at lines 7 and 13. 
+and C<$p> (connection to a machine named C<beowulf>) created at lines 7 and 13. 
 Two subroutines with the same name C<one> are installed
 on both machines (lines 10 and 16). As remote functions
 they don't collide since they are being executed in two different machines.
@@ -404,7 +404,7 @@ By default the home directory. For example:
 
 If it does not exist is created.
 
-See the section L<EXAMPLE> for a full example.
+See the section L<EXAMPLE: RUNNING DISTRIBUTION TESTS ON REMOTE MACHINES> for a full example.
 
 =item * startenv
 
@@ -1567,8 +1567,8 @@ Syntax:
 
 Returns TRUE if the given module is installed on the remote machine.
 
-
 =head1 ON THE REMOTE SIDE
+
 
 =head2 The Structure of the Remote Server
 
@@ -1618,6 +1618,11 @@ For each pair, the remote side writes to disk a file C<Module/Name.pm> with the 
 C<code for Module::Name>. The file is stored in the directory referenced by the C<prefix> attribute 
 of the C<GRID::Machine> object.
 
+
+=item * C<GRID::Machine::OPEN>
+
+Used by the C<open> method. As arguments receives a string
+defining the way the file will be accessed.
 
 =item * C<GRID::Machine::QUIT>
 
@@ -1684,6 +1689,7 @@ Syntax:
 Inside code to be executed on the remote machine we can use the function
 C<send_result> to send  results to the client
 
+
 =head1 EXTENDING THE PROTOCOL
 
 Let us see a simple example. We will extend the
@@ -1736,6 +1742,7 @@ When the program is executed we get the following output:
 
 =head1 THE C<GRID::Machine::Result> CLASS
 
+
 The class C<GRID::Machine::Result> is used by both the local and remote
 sides of the C<GRID::Machine>, though most of its methods are called 
 on the remote side. 
@@ -1747,7 +1754,7 @@ Such object has the following attributes:
 
 =item * I<type>
 
-The C<type> of result returned. A string. fixed by the protocol.
+The C<type> of result returned. A string. Fixed by the protocol.
 Common values are C<RETURNED> and C<DIED>.
 
 =item * I<stdout>
@@ -1807,7 +1814,10 @@ The Perl operator C<q("")> is overloaded using this method. Thus,
 wherever a C<GRID::Machine::Result> object is used on a scalar string 
 context the C<str> will be called.
 
+
+
 =head1 THE C<GRID::Machine::Message> CLASS
+
 
 This class is used by both the local and the remote sides of the
 C<GRID::Machine>. It implements the low level communication 
@@ -1833,6 +1843,8 @@ Examples:
   );
 
   $server->send_operation("RETURNED", exists($server->{stored_procedures}{$name}));
+
+
 
 
 Sends to other side of the link the C<type> of the message and the arguments.
@@ -2078,9 +2090,12 @@ When explicited by the client program it exports these functions:
 
 =back
 
+
 =head1 SEE ALSO
 
 =over 2
+
+=item * L<GRID::Machine>
 
 =item * L<GRID::Machine::IOHandle>
 
@@ -2123,5 +2138,7 @@ modify it under the same terms as Perl itself. See L<perlartistic>.
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+
+
 
 
