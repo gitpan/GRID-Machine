@@ -54,6 +54,7 @@ xdvi: doc
 
 html: doc
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine.pod
+	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/Core.pod
 
 publish: doc html xdvi
 	cp Machine.dvi /home/pp2/public_html/GRID_Machine/

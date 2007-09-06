@@ -89,7 +89,7 @@ __END__
 
 =head1 NAME
 
-GRID::Machine::RIOHandle
+GRID::Machine::RIOHandle - Remote side of the Remote Input-Output
 
 =head1 DESCRIPTION
 

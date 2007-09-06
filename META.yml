@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                GRID-Machine
-version:             0.076
+version:             0.077
 abstract:            Remote Procedure Calls over a SSH link
 license:             ~
 generated_by:        ExtUtils::MakeMaker version 6.31

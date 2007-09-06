@@ -1,4 +1,6 @@
-=head1 NAME C<GRID::Machine::Core> 
+=head1 NAME 
+
+GRID::Machine::Core 
 
 =head1 DESCRIPTION
 
