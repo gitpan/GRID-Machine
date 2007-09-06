@@ -3,7 +3,7 @@ use strict;
 use GRID::Machine;
 use Data::Dumper;
 
-my $machine = GRID::Machine->new( host => 'casiano@orion.pcg.ull.es',);
+my $machine = GRID::Machine->new( host => $ENV{GRID_REMOTE_MACHINE} || shift);
 
 $machine->sub( 
   nofilter => q{ map { $_*$_ } @_ },

@@ -14,7 +14,7 @@ $machine->put([$0]);
 
 for my $method (qw(r w e x s t f d)) {
   if ($machine->can($method)) {
-    my $r = $machine->$method('include4.pl')->result || "";
+    my $r = $machine->$method($0)->result || "";
     print $machine->host."->$method( include4.pl ) = <$r>\n";
   }
 }

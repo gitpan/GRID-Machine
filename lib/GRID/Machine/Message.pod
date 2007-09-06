@@ -52,6 +52,11 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
 
 =back
 
+
+
+
+=back
+
 =head1 AUTHOR
 
 Casiano Rodriguez Leon E<lt>casiano@ull.esE<gt>
@@ -67,7 +72,7 @@ The University of La Laguna has also supported my work in many ways
 and for many years.
 
 I wish to thank Paul Evans for his C<IPC::PerlSSH> module: it was the source
-of inspiration for this module. 
+of inspiration for this module. To Dmitri Kargapolov for his contributions.
 Thanks also to Juana, Coro, my students at La Laguna and to the Perl Community. 
 
 =head1 LICENCE AND COPYRIGHT

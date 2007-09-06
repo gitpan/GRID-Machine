@@ -2,7 +2,7 @@
 use strict;
 use GRID::Machine;
 
-my $machine = shift || 'orion.pcg.ull.es';
+my $machine = $ENV{GRID_REMOTE_MACHINE} || shift;
 my $m = GRID::Machine->new( host => $machine );
 
 for (qw(r w e x z s f d  t T B M A C)) {  
@@ -17,5 +17,5 @@ for (qw(r w e x z s f d  t T B M A C)) {
 my @files = $m->eval(q{ glob('*') })->Results;
 
 for (@files) {
-  print "$_ is a directory\n" if $m->call('d', "$_")->result;
+  print "$_ is a directory\n" if $m->call('d', $_)->result;
 }

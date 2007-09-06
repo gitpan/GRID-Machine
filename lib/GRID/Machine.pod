@@ -1,3 +1,8 @@
+=for PROGRAMMERS
+Don't write in Machine.pod file!!!!!
+Changes will be lost!!.
+Use Template Toolkit tt2/Machine.tt2 instead
+
 =head1 NAME
 
 GRID::Machine - Remote Procedure Calls over a SSH link
@@ -99,7 +104,7 @@ you have to:
 
 The option C<-t> selects the type of key you want to generate.
 There are three types of keys: I<rsa1>, I<rsa> and I<dsa>.
-The C<-N> option is followd by the I<passphrase>. The C<-N ''> setting
+The C<-N> option is followed by the I<passphrase>. The C<-N ''> setting
 indicates that no pasphrase will be used. This is useful when used 
 with key restrictions or when dealing with cron jobs, batch 
 commands and automatic processing which is the context in which this 
@@ -116,7 +121,7 @@ Your public key will be saved in C</home/user/.ssh/id_rsa.pub>.
 
 =item * Once you have generated a key pair, you must install the public key on the 
 remote machine. To do it, append the public component of the key C</home/user/.ssh/id_rsa.pub>
-to the C<home/user/.ssh/authorized_keys> file on the remote machine.
+to file C</home/user/.ssh/authorized_keys> on the remote machine.
 If the C<ssh-copy-id> script is available, you can do it using:
 
   $ ssh-copy-id -i ~/.ssh/id_rsa.pub user@machine1
@@ -128,14 +133,6 @@ Alternatively you can write the following command:
 The C<umask> command is needed since the SSH server will refuse to 
 read a C<home/user/.ssh/authorized_keys> files which have loose permissions.
 
-=item * Once the public key is installed on the server you should be able to
-authenticate using your private key
-
-  $ ssh remote.machine
-  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686
-  Last login: Sat Jul  7 13:34:00 2007 from local.machine
-  user@remote.machine:~$                                 
-
 =item * Edit your local C</home/.ssh/config> file and add lines like:
 
  Host remote.machine
@@ -146,6 +143,15 @@ authenticate using your private key
 
 This way you don't have to specify your I<login> name on the remote machine even if it
 differs from your  I<login> name in the local machine.
+
+=item * Once the public key is installed on the server you should be able to
+authenticate using your private key
+
+  $ ssh remote.machine
+  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686
+  Last login: Sat Jul  7 13:34:00 2007 from local.machine
+  user@remote.machine:~$                                 
+
 
 =back
 
@@ -283,21 +289,37 @@ The host to connect. The user can be specified here.
 
 Relative path of the file where remote C<STDOUT> will be redirected.
 Each time a RPC occurs STDOUT is redirected to a file. By default the name of this file
-is C<$ENV{HOME}/rperl$$.log> where C<$$> is the PID of the program running
-in the local machine.
+is C<$ENV{HOME}/rperl$$.log>, where C<$$> is the PID of the process running
+in the remote machine.
 
 =item * err
 
 Relative path of the file where remote C<STDERR> will be redirected.
 Each time a RPC occurs STDERR is redirected to a file. By default the name of this file
-is C<$ENV{HOME}/rperl$$.err> where C<$$> is the PID of the program running
-in the local machine.
+is C<$ENV{HOME}/rperl$$.err>, where C<$$> is the PID of the process running
+in the remote machine.
+
+When executing the following program:
+
+  use strict;
+  use GRID::Machine;
+
+  my $machine = GRID::Machine->new( host => $ENV{GRID_REMOTE_MACHINE} || shift);
+  print $machine->eval(q{ system('ls -l *.err *.log') })->stdout;
+
+the output will be similar to this:
+
+  $ logerr.pl
+  -rw-r--r-- 1 casiano casiano 0 2007-09-05 13:15 rperl22694.err
+  -rw-r--r-- 1 casiano casiano 0 2007-09-05 13:15 rperl22694.log
+
 
 =item * wait
 
 Maximum number of seconds to wait for the setting of the connection.
 If an automatic connection can't be established in such time.
-The constructor calls the L<is_operative function|"The Function is_operative"> to check this.
+The constructor calls the C<is_operative function> 
+(see section L<The Function is_operative>) to check this.
 The default value is 15 seconds.
 
 =item * ssh
@@ -312,7 +334,14 @@ machines. Defaults to C<scp -q -p>.
 
 =item * readfunc
 
+Reference to the function used to read from the other side of the pipe. Returns the length
+of the message. Receives the buffer where the message will be stored. The second optional argument
+is the number of characters to read.
+
 =item * writefunc
+
+Reference to the function used to write to the other side of the pipe. Receives
+the message to write. By default is:
 
 =item * cleanup
 
@@ -440,7 +469,8 @@ the libraries will be stored. By default is C<$ENV{HOME}/perl5lib>.
 =item * uses
 
 A reference to an ARRAY of strings. Determines the modules that will be 
-loaded when the remote Perl interpreter is started. For instance:
+loaded when the remote Perl interpreter is started. The enumerated modules must be 
+available on the remote side. For instance:
 
   my $machine = GRID::Machine->new(host => $host, uses => [ 'POSIX qw( uname )' ])
 
@@ -590,7 +620,8 @@ Now the execution produces the following output:
 
 =head3 Scope and Visbility Issues
 
-Since the C<eval> method wraps the code into a subroutine like this
+Since the C<eval> method wraps the code into a subroutine 
+(see section L<The Algorithm of eval>) like this
 
                my $subref = eval "use strict; sub { $code }";
 
@@ -645,7 +676,7 @@ a (involutary)  I<closure>. See the example:
      5  my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
      6
      7  my $r = $machine->eval(q{
-     8  #line 9  "vars3.pl"
+     8  #line 9  "vars5.pl"
      9    my $h = 1;
     10
     11    sub dumph {
@@ -659,7 +690,7 @@ a (involutary)  I<closure>. See the example:
     19  print "$r\n";
     20
     21  $r = $machine->eval(q{
-    22  #line 23  "vars3.pl"
+    22  #line 23  "vars5.pl"
     23    dumph();
     24  });
     25
@@ -670,7 +701,7 @@ a (involutary)  I<closure>. See the example:
 When executed, the program produces the following warning:
 
   $ vars5.pl
-  Variable "$h" will not stay shared at vars3.pl line 12, <STDIN> line 32.
+  Variable "$h" will not stay shared at vars5.pl line 12, <STDIN> line 32.
   1
   2
 
@@ -686,7 +717,7 @@ If you want lexical nested subroutines declare them thorugh a reference:
      5  my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
      6
      7  my $r = $machine->eval(q{
-     8  #line 9  "vars3.pl"
+     8  #line 9  "vars6.pl"
      9    my $h = 1;
     10
     11    use vars '$dumph';
@@ -701,7 +732,7 @@ If you want lexical nested subroutines declare them thorugh a reference:
     20  print "$r\n";
     21
     22  $r = $machine->eval(q{
-    23  #line 27  "vars3.pl"
+    23  #line 24  "vars6.pl"
     24    $dumph->(); # Prints 2
     25  });
     26
@@ -720,7 +751,7 @@ Syntax:
 This method sends code to the remote host to store it inside the remote
 side of the C<GRID::Machine> object. Namely, the C<stored_procedures> 
 attribute of the remote object is a hash reference containing the stored 
-subroutines. The C<$code> is compiled into a C<CODE> reference which
+subroutines. The string C<$code> is compiled into a C<CODE> reference which
 can be executed later through the C<call> method.
 
 The two first arguments are the name C<$name> of the subroutine and the 
@@ -731,31 +762,35 @@ the regexp C<[a-zA-Z_]\w*>. Full names aren't allowed.
 
 The following example uses C<compile> to
 install handlers for the most common file-testing
-functions C<-r> (is readable), C<-w> (writeable), etc. (lines 6-13):
+functions C<-r> (is readable), C<-w> (writeable), etc. (lines 8-15):
 
-     1  use GRID::Machine;
-     2
-     3  my $machine = shift || 'remote.machine.domain';
-     4  my $m = GRID::Machine->new( host => $machine );
-     5
-     6  for (qw(r w e x z s f d  t T B M A C)) {
-     7    $m->compile( "$_" => qq{
-     8        my \$file = shift;
-     9
-    10        return -$_ \$file;
-    11      }
-    12    );
-    13  }
-    14
-    15  my @files = $m->eval(q{ glob('*') })->Results;
+  $ cat -n compile.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $machine = $ENV{GRID_REMOTE_MACHINE} || shift;
+     6  my $m = GRID::Machine->new( host => $machine );
+     7
+     8  for (qw(r w e x z s f d  t T B M A C)) {
+     9    $m->compile( "$_" => qq{
+    10        my \$file = shift;
+    11
+    12        return -$_ \$file;
+    13      }
+    14    );
+    15  }
     16
-    17  for (@files) {
-    18    print "$_ is a directory\n" if $m->call('d', "$_")->result;
-    19  }
+    17  my @files = $m->eval(q{ glob('*') })->Results;
+    18
+    19  for (@files) {
+    20    print "$_ is a directory\n" if $m->call('d', $_)->result;
+    21  }
 
-After the testing functions  are installed (lines 6-13),
-a list of files in the current (remote) directory is obtained (line 15)
-and those which are directories are printed (lines 17-19).
+
+After the testing functions  are installed (lines 8-15),
+a list of files in the current (remote) directory is obtained (line 17)
+and those which are directories are printed (lines 19-21).
 
 =head3 Collisions
 
@@ -791,7 +826,7 @@ To avoid overwriting an existent function the C<exists> method can be used:
 
 =head3 The C<politely> argument
 
-an alternative solution is to use the C<politely> argument of C<compile>. 
+An alternative solution is to use the C<politely> argument of C<compile>. 
 If true the function won't be
 overwritten:
 
@@ -852,7 +887,7 @@ returns the first element of the resulting list:
      3  use GRID::Machine;
      4  use Data::Dumper;
      5
-     6  my $machine = GRID::Machine->new( host => 'casiano@orion.pcg.ull.es',);
+     6  my $machine = GRID::Machine->new( host => $ENV{GRID_REMOTE_MACHINE} || shift);
      7
      8  $machine->sub(
      9    nofilter => q{ map { $_*$_ } @_ },
@@ -964,7 +999,7 @@ where the two local arguments C<$w> and C<$z> are the same:
      5  my $machine = GRID::Machine->new(host => shift(), uses => [ 'Sys::Hostname' ]);
      6
      7  my $r = $machine->sub( iguales => q{
-     8  #line 12 "alias.pl"
+     8  #line 9 "alias.pl"
      9      my ($first, $sec) = @_;
     10
     11      print hostname().": $first and $sec are ";
@@ -1067,7 +1102,7 @@ Syntax:
                 read_modules(qw(Module:One Module::Two, Module::Three, ...))
 
 Searches for the specified modules C<Module:One>, etc.
-in the current Perl installation.
+in the local Perl installation.
 Returns a string with the concatenation of the 
 contents of these modules. 
 
@@ -1258,9 +1293,9 @@ When executed, the former program produces an output like this:
 =head2 The C<include> Method
 
 L<The sub Method> permits the installation of a remote subroutine as a method
-of the C<GRID::Machine> object. This is valid when only a few subroutines are involved.
-However for large number of subroutines that procedure is error prone. It seems
-to be better to have the code in some separated module.
+of the C<GRID::Machine> object. This is efficient when only a few subroutines are involved.
+However for large number of subroutines that procedure is error prone. It 
+is better to have the code in some separated module.
 This way we can test the components on the local machine and, once we are 
 confident of their correct behavior, proceed to 
 load them onto the remote machine. This is what C<include> is for. 
@@ -1299,7 +1334,7 @@ Consider the following I<Remote Module>:
     12    print "sub two\n";
     13  }
 
-That is used by the following program:
+The following program I<includes> the remote module C<Include5.pm>:
 
   $ cat -n include5.pl
      1  #!/usr/local/bin/perl -w
@@ -1404,11 +1439,11 @@ C<LOCAL>:
 
 =item *
 A C<use Something> pragma inside a I<Remote Module> indicates that such module 
-C<Something> will be loaded
+C<Something> must be loaded
 onto the remote machine. Of course, the module
 must be available there. An alternative to install it
 is to transfer the module(s) on the local 
-machine to the remote machine using C<modput>.
+machine to the remote machine using C<modput> (see section L<The modput Method>).
 
 =item *
 A C<LOCAL { code }> directive inside a I<Remote Module> wraps C<code> that 
@@ -1417,9 +1452,7 @@ load subroutines as in the example below.
 
 =back
 
-The following remote module contains a C<use> pragma in line 2. The call to 
-C<include> will load C<List::Util> on the remote machine importing
-the C<sum> function.
+The following remote module contains a C<use> pragma in line 2. 
 
   $ cat -n Include4.pm
      1  use strict;
@@ -1448,7 +1481,10 @@ object that will be equivalent to the classic Perl file tests: C<-r>, C<-w>, etc
 Inside a C<LOCAL> directive the function C<SERVER> returns a reference 
 to the current C<GRID::Machine> object (see line 11).
 
-See a program that loads the former I<Remote Module>:
+See a program that loads the former I<Remote Module>.
+The call to C<include> will load C<List::Util> on the remote machine importing
+the C<sum> function. Furthermore, methods with names
+C<sigma>, C<r>, C<w>, etc. will be installed:
 
   $ cat -n include4.pl
      1  #!/usr/local/bin/perl -w
@@ -1467,7 +1503,7 @@ See a program that loads the former I<Remote Module>:
     14
     15  for my $method (qw(r w e x s t f d)) {
     16    if ($machine->can($method)) {
-    17      my $r = $machine->$method('include4.pl')->result || "";
+    17      my $r = $machine->$method($0)->result || "";
     18      print $machine->host."->$method( include4.pl ) = <$r>\n";
     19    }
     20  }
@@ -1487,39 +1523,51 @@ When executed the program produces an output like:
   user@remote.machine.es->f( include4.pl ) = <1>
   user@remote.machine.es->d( include4.pl ) = <>
 
-=head2 The C<GRID::Machine::Core> Class 
+=head1 THE C<GRID::Machine::Core> REMOTE MODULE
 
 The creation of a C<GRID::Machine> object through a call to C<GRID::Machine-E<gt>new>
 implies the loading of a I<Remote Module> called  C<GRID::Machine::Core> which is delivered
-with the C<GRID::Machine> distribution.
+with the C<GRID::Machine> distribution. Another module that is being I<included> at 
+construction time is C<GRID::Machine::RIOHandle>.
 
 The following functions defined in the Remote Module C<GRID::Machine::Core> are loaded
 via the C<include> mechanism on the remote machine. Therefore, they work as methods of the
 C<GRID::Machine> object on the local machine. They perform the same operations than their Perl
 aliases:
 
-=head3 Function C<getcwd>
+=head2 Function C<getcwd>
 
-=head3 Function C<chdir>
+=head2 Function C<chdir>
 
-=head3 Function C<umask>
+=head2 Function C<umask>
 
-=head3 Function C<mkdir>
+=head2 Function C<mkdir>
 
-=head3 Function C<system>
+=head2 Function C<system>
 
-=head3 Function C<glob>
+=head2 Function C<glob>
 
-=head3 Function C<tar>
+=head2 Function C<tar>
 
-=head3 Function C<version>
+Is equivalent to:
+
+            system('tar', $options, ,'-f', $file)
+
+Where C<$options> is a string containing the options.
+Returns the error code from C<tar>.
+Example:
+
+  $m->tar($dist, '-xz')->ok or warn "$host: Can't extract files from $dist\n";
+
+=head2 Function C<version>
 
 Syntax:
 
               $machine->version('Some::Module')
 
 Returns the VERSION of the module if the given module is installed on the remote machine
-and has a VERSION number.
+and has a VERSION number. 
+
 See an example of use:
 
   $ cat version.pl
@@ -1559,13 +1607,18 @@ When executed the program produces an  output similar to this:
                  }, 'GRID::Machine::Result' );
 
 
-=head3 Function C<installed>
+=head2 Function C<installed>
 
 Syntax:
 
               $machine->installed('Some::Module')
 
 Returns TRUE if the given module is installed on the remote machine.
+Is equivalent to:
+
+            system("$^X -M$module -e 0")
+
+
 
 =head1 ON THE REMOTE SIDE
 
@@ -2110,6 +2163,18 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
 
 =back
 
+
+=head1 CONTRIBUTORS
+
+=over 2 
+
+=item * Dmitriy Kargapolov 
+
+=back
+
+
+=back
+
 =head1 AUTHOR
 
 Casiano Rodriguez Leon E<lt>casiano@ull.esE<gt>
@@ -2125,7 +2190,7 @@ The University of La Laguna has also supported my work in many ways
 and for many years.
 
 I wish to thank Paul Evans for his C<IPC::PerlSSH> module: it was the source
-of inspiration for this module. 
+of inspiration for this module. To Dmitri Kargapolov for his contributions.
 Thanks also to Juana, Coro, my students at La Laguna and to the Perl Community. 
 
 =head1 LICENCE AND COPYRIGHT

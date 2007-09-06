@@ -36,6 +36,7 @@ doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
 	cd tt2; tpage  Machine.tt2 > ../lib/GRID/Machine.pod
 	cd tt2; tpage  Message.tt2 > ../lib/GRID/Machine/Message.pod
 	cd tt2; tpage  REMOTE.tt2 > ../lib/GRID/Machine/REMOTE.pod
+	cd tt2; tpage  Core.tt2 > ../lib/GRID/Machine/Core.pod
 	cd tt2; tpage  Result.tt2 > ../lib/GRID/Machine/Result.pod
 
 pdf: @files
