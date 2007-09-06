@@ -55,8 +55,6 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
 
 
 
-=back
-
 =head1 AUTHOR
 
 Casiano Rodriguez Leon E<lt>casiano@ull.esE<gt>

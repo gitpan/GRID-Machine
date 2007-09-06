@@ -4,9 +4,11 @@ setperl5lib
 MANIFEST
 README
 TODO
+kwalitee.pl
 t/01synopsis.t
 t/02pod.t
 t/03includes.t
+t/05podcoverage.t
 t/Include2.pm
 t/Include.pm
 lib/GRID/Machine.pm
@@ -18,6 +20,7 @@ lib/GRID/Machine/Message.pm
 lib/GRID/Machine/REMOTE.pm
 lib/GRID/Machine/Result.pm
 lib/GRID/Machine/RIOHandle.pm
+lib/GRID/Machine/Core.pod
 lib/GRID/Machine/Message.pod
 lib/GRID/Machine/REMOTE.pod
 lib/GRID/Machine/Result.pod
@@ -108,4 +111,7 @@ examples/Include.pm
 examples/MyLocal.pm
 examples/MyRemote.pm
 examples/Remotesub.pm
+examples/logerr.pl
+examples/m.pl
+examples/testrem.pm
 META.yml                                 Module meta-data (added by MakeMaker)

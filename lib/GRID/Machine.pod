@@ -96,8 +96,6 @@ verify a challenge signed by the user's I<private key> against its copy
 of the user's I<publick key>. To achieve this automatic ssh-authentification
 you have to:
 
-=over 2
-
 =item * Generate a public key use the C<ssh-keygen> utility. For example:
 
   $ ssh-keygen -t rsa -N ''
@@ -151,9 +149,6 @@ authenticate using your private key
   Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686
   Last login: Sat Jul  7 13:34:00 2007 from local.machine
   user@remote.machine:~$                                 
-
-
-=back
 
 
 =item  * Before running the tests. Set on the local machine the environment variable 
@@ -2172,8 +2167,6 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
 
 =back
 
-
-=back
 
 =head1 AUTHOR
 
