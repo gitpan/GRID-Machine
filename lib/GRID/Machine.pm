@@ -23,7 +23,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.077";
+our $VERSION = "0.078";
 
 sub read_modules {
 
@@ -59,6 +59,7 @@ sub read_modules {
     host command
     perl
     uses
+    includes
     remotelibs
     startdir startenv 
     pushinc unshiftinc
@@ -252,6 +253,10 @@ EOREMOTE
      # Allow the user to include their own
      $self->include('GRID::Machine::Core');
      $self->include('GRID::Machine::RIOHandle');
+
+     $opts{includes} = [] unless UNIVERSAL::isa($opts{includes}, 'ARRAY');
+     my @includes = @{$opts{includes}};
+     $self->include($_) for @includes;
 
      return $self;
   }

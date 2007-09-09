@@ -32,6 +32,13 @@ sub ok {
   return $self->{type} ne 'DIED';
 }
 
+sub noerr {
+  my $self = shift;
+
+  return (($self->{type} ne 'DIED') and  ($self->{stderr} eq ''));
+}
+
+
 sub result {
   my $self = shift;
 

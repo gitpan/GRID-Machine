@@ -1525,6 +1525,11 @@ implies the loading of a I<Remote Module> called  C<GRID::Machine::Core> which i
 with the C<GRID::Machine> distribution. Another module that is being I<included> at 
 construction time is C<GRID::Machine::RIOHandle>.
 
+One of the final goals of the C<GRID::Machine::Core> remote 
+module is to provide homonymous methods per each of the Perl
+C<CORE::> functions. At present time only a few are supported.
+
+
 The following functions defined in the Remote Module C<GRID::Machine::Core> are loaded
 via the C<include> mechanism on the remote machine. Therefore, they work as methods of the
 C<GRID::Machine> object on the local machine. They perform the same operations than their Perl
@@ -1612,6 +1617,48 @@ Returns TRUE if the given module is installed on the remote machine.
 Is equivalent to:
 
             system("$^X -M$module -e 0")
+
+=head2 File Status Methods
+
+Methods that are equivalent to the tests function
+
+      -r -w -e -x -z -s -f -d  -t -T -B -M -A -C
+
+are provided. Since hyphens aren't legal in Perl identifiers
+the hyphen has been substituted by an underscore.
+See an example:
+
+  $ cat -n copyandmkdir.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $host = 'orion.pcg.ull.es';
+     6  my $dir = shift || "somedir";
+     7  my $file = shift || $0; # By default copy this program
+     8
+     9  my $machine = GRID::Machine->new(
+    10    host => $host,
+    11    uses => [qw(Sys::Hostname)],
+    12  );
+    13
+    14  my $r;
+    15  $r = $machine->mkdir($dir, 0777) unless $machine->_w($dir);
+    16  die "Can't make dir\n" unless $r->ok;
+    17  $machine->chdir($dir)->ok or die "Can't change dir\n";
+    18  $machine->put([$file]) or die "Can't copy file\n";
+    19  print "HOST: ",$machine->eval(" hostname ")->result,"\n",
+    20        "DIR: ",$machine->getcwd->result,"\n",
+    21        "FILE: ",$machine->glob('*')->result,"\n";
+
+
+When this program runs we get an output similar to this:
+
+                    $ copyandmkdir.pl
+                    HOST: orion
+                    DIR: /home/casiano/somedir
+                    FILE: copyandmkdir.pl
+
 
 
 
@@ -1846,6 +1893,44 @@ Builds a new result object.
 
 Returns C<TRUE> if the RPC didn't died, i.e. if the C<type> attribute is not
 the string C<'DIED'>
+
+=head2 The C<noerr> Method
+
+Returns C<TRUE> if the RPC didn't died and didn't send any messages 
+through stderr.
+See an example. When running the following program:
+
+  $ cat noerrvsok.pl
+  #!/usr/local/bin/perl -w
+  use strict;
+  use GRID::Machine;
+
+  my $machine = shift || $ENV{GRID_REMOTE_MACHINE};
+  my $m = GRID::Machine->new( host => $machine );
+
+  my $r = $m->eval( q{print STDERR "This is the end\n" });
+
+  print "print to STDERR:\n";
+  print "<".$r->ok.">\n";
+  print "<".$r->noerr.">\n";
+
+  $r = $m->eval( q{warn "This is a warning\n" });
+
+  print "Warn:\n";
+  print "<".$r->ok.">\n";
+  print "<".$r->noerr.">\n";
+
+we get the following output:
+
+
+
+                $ errvsok.pl
+                print to STDERR:
+                <1>
+                <>
+                Warn:
+                <1>
+                <>
 
 =head2 The C<result> Method
 

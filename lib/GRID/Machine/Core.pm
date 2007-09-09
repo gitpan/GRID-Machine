@@ -75,3 +75,17 @@ sub installed {
 
   !CORE::system("$^X -M$module -e 0");
 }
+
+LOCAL {
+  for (qw(r w e x z s f d  t T B M A C)) {
+    SERVER->sub( "_$_" => qq{
+        my \$file = shift;
+
+        return -$_ \$file;
+      }
+    );
+  }
+}
+
+__END__
+

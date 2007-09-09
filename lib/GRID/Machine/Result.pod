@@ -61,6 +61,44 @@ Builds a new result object.
 Returns C<TRUE> if the RPC didn't died, i.e. if the C<type> attribute is not
 the string C<'DIED'>
 
+=head2 The C<noerr> Method
+
+Returns C<TRUE> if the RPC didn't died and didn't send any messages 
+through stderr.
+See an example. When running the following program:
+
+  $ cat noerrvsok.pl
+  #!/usr/local/bin/perl -w
+  use strict;
+  use GRID::Machine;
+
+  my $machine = shift || $ENV{GRID_REMOTE_MACHINE};
+  my $m = GRID::Machine->new( host => $machine );
+
+  my $r = $m->eval( q{print STDERR "This is the end\n" });
+
+  print "print to STDERR:\n";
+  print "<".$r->ok.">\n";
+  print "<".$r->noerr.">\n";
+
+  $r = $m->eval( q{warn "This is a warning\n" });
+
+  print "Warn:\n";
+  print "<".$r->ok.">\n";
+  print "<".$r->noerr.">\n";
+
+we get the following output:
+
+
+
+                $ errvsok.pl
+                print to STDERR:
+                <1>
+                <>
+                Warn:
+                <1>
+                <>
+
 =head2 The C<result> Method
 
 Returns the first element of the list referenced by the C<results> attribute
