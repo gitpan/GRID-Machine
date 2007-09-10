@@ -211,6 +211,9 @@ sub QUIT {
     my $server = shift;
     my $subref = shift;
 
+    local *SAVEOUT;
+    local *SAVEERR;
+
       $server->save_and_open_stdfiles 
     or return GRID::Machine::Result->new(errmsg => "Can't redirect stdout and stderr");
 
@@ -350,6 +353,38 @@ sub MODPUT {
     results => [1] 
   );
   return;
+}
+
+# Sends a message for inmediate print to the local machine
+# Goes in reverse: The remote makes the request the local 
+# serves the request
+sub gprint {
+   my $wf = SERVER->writefunc;
+   SERVER->writefunc( sub { syswrite SAVEOUT, $_[0] });
+
+   #$Data::Dumper::Deparse = 1;
+   #print Dumper SERVER;
+
+   SERVER->send_operation('GPRINT', @_);
+
+   SERVER->writefunc( $wf );
+   # Don't wait for answer?
+   return 1;
+}
+
+
+# Sends a message for inmediate printf to the local machine
+# Goes in reverse: The remote makes the request, the local 
+# serves the request
+sub gprintf {
+   my $wf = SERVER->writefunc;
+   SERVER->writefunc( sub { syswrite SAVEOUT, $_[0] });
+
+   SERVER->send_operation('GPRINTF', @_);
+
+   SERVER->writefunc( $wf );
+   # Don't wait for answer?
+   return 1;
 }
 
 sub OPEN {

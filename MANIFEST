@@ -116,4 +116,5 @@ examples/m.pl
 examples/testrem.pm
 examples/copyandmkdir.pl
 examples/noerrvsok.pl
+examples/gprint.pl
 META.yml                                 Module meta-data (added by MakeMaker)
