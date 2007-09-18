@@ -15,21 +15,22 @@ WriteMakefile(
 );
 
 sub MY::postamble {
-my @files = qw(
-  TODO
-  lib/GRID/Machine.pm
-  lib/GRID/Machine/Core.pm
-  lib/GRID/Machine/MakeAccessors.pm
-  lib/GRID/Machine/Message.pm
-  lib/GRID/Machine/REMOTE.pm
-  lib/GRID/Machine/Request.pm
-  lib/GRID/Machine/Result.pm
-  lib/GRID/Machine/IOHandle.pm
-  lib/GRID/Machine/RIOHandle.pm
-  examples/MyLocal.pm
-  examples/MyRemote.pm
-  examples/extendprotocol.pl
-  examples/synopsis1.pl
+my @files = (
+  'TODO',
+  'lib/GRID/Machine.pm',
+#  'lib/GRID/Machine/Core.pm',
+#  'lib/GRID/Machine/MakeAccessors.pm',
+#  'lib/GRID/Machine/Message.pm',
+  'lib/GRID/Machine/REMOTE.pm',
+#  'lib/GRID/Machine/Request.pm',
+#  'lib/GRID/Machine/Result.pm',
+#  'lib/GRID/Machine/IOHandle.pm',
+#  'lib/GRID/Machine/RIOHandle.pm',
+#  'examples/MyLocal.pm',
+#  'examples/MyRemote.pm',
+#  'examples/extendprotocol.pl',
+#  'examples/synopsis',1'.pl',
+   'examples/gprint.pl',
 );
 return <<"EOT";
 doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
@@ -55,6 +56,7 @@ xdvi: doc
 html: doc
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/Core.pod
+	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/REMOTE.pod
 
 publish: doc html xdvi
 	cp Machine.dvi /home/pp2/public_html/GRID_Machine/

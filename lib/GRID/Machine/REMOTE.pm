@@ -45,6 +45,8 @@ sub send_result {
     prefix
     Indent Deparse
     stored_procedures
+    SAVEOUT
+    SAVEERR
   );
   my %legal = map { $_ => 1 } @legal;
 
@@ -165,76 +167,77 @@ sub QUIT {
     exit( 0 ) 
 }
 
-{
-  local *SAVEOUT;
-  local *SAVEERR;
+sub save_and_open_stdfiles {
+  my $server = shift;
 
-  sub save_and_open_stdfiles {
-    my $server = shift;
+  my $log = $server->{log};
+  my $err = $server->{err};
+  my ($SAVEOUT, $SAVEERR);
 
-    my $log = $server->{log};
-    my $err = $server->{err};
-    open(SAVEOUT, ">&STDOUT") or return 0; # or die ...
-    open(STDOUT,"> $log") or return 0;     # or die ..
+  open($SAVEOUT, ">&", STDOUT) or return 0; # or die ...
+  open(STDOUT,"> $log") or return 0;     # or die ..
 
-    open(SAVEERR, ">&STDERR") or return 0; # or die ...
-    open(STDERR,"> $err") or return 0;     # or die ..
-    return 1;
+  open($SAVEERR, ">&", STDERR) or return 0; # or die ...
+  open(STDERR,"> $err") or return 0;     # or die ..
+
+  $server->{SAVEOUT} = $SAVEOUT;
+  $server->{SAVEERR} = $SAVEERR;
+
+  return 1;
+}
+
+sub read_and_reset_stdfiles {
+  my $server = shift;
+
+  my $SAVEOUT = $server->{SAVEOUT};
+  my $SAVEERR = $server->{SAVEERR};
+
+  open(STDOUT, ">&", $SAVEOUT);
+  open(STDERR, ">&", $SAVEERR);
+
+  my $sendstdout = $server->{sendstdout};
+
+  my $log = $server->{log};
+  my $err = $server->{err};
+  my ($rstdout, $rstderr) = ("", "");
+  if ($sendstdout) {
+    local $/ = undef;
+    my $file;
+    open($file, $log) or return (); 
+      $rstdout = <$file>;
+    close($file);
+
+    open($file, $err) or return (); 
+      $rstderr = <$file>;
+    close($file);
   }
+  return ($rstdout, $rstderr);
+}
 
-  sub read_and_reset_stdfiles {
-    my $server = shift;
+sub redirect_and_eval {
+  my $server = shift;
+  my $subref = shift;
 
-    open(STDOUT, ">&SAVEOUT");
-    open(STDERR, ">&SAVEERR");
+    $server->save_and_open_stdfiles 
+  or return GRID::Machine::Result->new(errmsg => "Can't redirect stdout and stderr");
 
-    my $sendstdout = $server->{sendstdout};
+      my @results = eval { $subref->( @_ ) };
 
-    my $log = $server->{log};
-    my $err = $server->{err};
-    my ($rstdout, $rstderr) = ("", "");
-    if ($sendstdout) {
-      local $/ = undef;
-      my $file;
-      open($file, $log) or return (); 
-        $rstdout = <$file>;
-      close($file);
+  my $err = $@;
+  my @output = $server->read_and_reset_stdfiles;
 
-      open($file, $err) or return (); 
-        $rstderr = <$file>;
-      close($file);
-    }
-    return ($rstdout, $rstderr);
-  }
+    return GRID::Machine::Result->new(errmsg => "Can't recover stdout and stderr")
+  unless @output;
 
-  sub redirect_and_eval {
-    my $server = shift;
-    my $subref = shift;
+  my ($rstdout, $rstderr) = @output;
 
-    local *SAVEOUT;
-    local *SAVEERR;
-
-      $server->save_and_open_stdfiles 
-    or return GRID::Machine::Result->new(errmsg => "Can't redirect stdout and stderr");
-
-        my @results = eval { $subref->( @_ ) };
-
-    my $err = $@;
-    my @output = $server->read_and_reset_stdfiles;
-
-      return GRID::Machine::Result->new(errmsg => "Can't recover stdout and stderr")
-    unless @output;
-
-    my ($rstdout, $rstderr) = @output;
-
-    return GRID::Machine::Result->new(
-      stdout => $rstdout, 
-      errmsg  => $err, 
-      stderr => $rstderr, 
-      results => \@results
-    );
-  }
-} # end of closure for SAVEOUT, SAVEERR
+  return GRID::Machine::Result->new(
+    stdout => $rstdout, 
+    errmsg  => $err, 
+    stderr => $rstderr, 
+    results => \@results
+  );
+}
 
 sub EVAL {
   my ($server, $code, $args) = @_;
@@ -360,12 +363,14 @@ sub MODPUT {
 # serves the request
 sub gprint {
    my $wf = SERVER->writefunc;
-   SERVER->writefunc( sub { syswrite SAVEOUT, $_[0] });
+   my $SAVEOUT = SERVER->{SAVEOUT};
+
+   SERVER->writefunc( sub { syswrite $SAVEOUT, $_[0] });
 
    #$Data::Dumper::Deparse = 1;
    #print Dumper SERVER;
 
-   SERVER->send_operation('GPRINT', @_);
+   SERVER->send_operation('GRID::Machine::GPRINT', @_);
 
    SERVER->writefunc( $wf );
    # Don't wait for answer?
@@ -378,9 +383,11 @@ sub gprint {
 # serves the request
 sub gprintf {
    my $wf = SERVER->writefunc;
-   SERVER->writefunc( sub { syswrite SAVEOUT, $_[0] });
+   my $SAVEOUT = SERVER->{SAVEOUT};
 
-   SERVER->send_operation('GPRINTF', @_);
+   SERVER->writefunc( sub { syswrite $SAVEOUT, $_[0] });
+
+   SERVER->send_operation('GRID::Machine::GPRINTF', @_);
 
    SERVER->writefunc( $wf );
    # Don't wait for answer?

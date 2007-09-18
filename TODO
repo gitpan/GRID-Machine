@@ -5,34 +5,9 @@
 
 * Method "call" must specify the context: if scalar or list. Important for IO.
 
-* Debug: put a field "debug" wich concatenates the debug info
-    $m->debug("info: $info")
-  It will be sent back to the client asap
+* When installing a sub fields "thaw" and "freeze". By default Data::Dumper and eval
 
 * The "rsync" Method
-
-* Remote IO. Al igual que existe el concepto de "remote sub" existe el concepto
-  de remote file:
-
-     my $file = $beo->open("chuchu.dat"),
-     $x = $file->getline; # funcionara?
-     # O mejor:
-     $/ = undef;
-     $y = <$file>;
-
-  There is s.t. odd in the example. $/ = undef; occurs in local, so, it must be s.t. like:
-     $m->eval{ $/ = undef };
-     $y = <$file>;
-
-  But then we have the problem of locality.
-
-  Tendriamos una lista de files en el remoto. En el local es un objeto que guarda,
-  la máquina (GRID::Machine), el indice de la lista, etc.. La llamada a
-  un metodo de IO::File provoca  la llamada al mismo método en el remoto. 
-  El local se limita a retornar el valor remoto.
-
-* GRID::Machine::Request is not being used: use it or discard it
-   -- Request objects will help to set the "context" (llist, scalar, etc.)
 
 * Deferred DECISION: 
                 allow (or not) pass by reference in RPC?
@@ -41,26 +16,8 @@
 
   meaning that variables 0,3,4,5, and from 9 to the end are passed by reference
 
-* Convert to boolean according to results
-
-* Provide the "use" function for traits;
-
-* Inicialización de subrutinas de forma masiva mediante código que se ejecuta en local
-  algo parecido a un RAWBEGIN
-
-* Igual que existe "exclude" deberia existir un "force"
-
-* Mecanismo de extensión de métodos en el remoto. Algo que permita
-  poner mas métodos para extender el protocolo de comunicaciones.
-  Parece que debieramos cargarlo en el remoto. Por tanto debería ser
-  un servicio que permitiera leer un fichero y cargarlo en el package
-  asi como poner una parte en el local.
-
 * args{log}: Ahora se fuerza a que sea relativo al HOME. Si es absoluto que se hace?
   Crearlo si no existe?
-
-* Write rprint and rprintf. They will allow for immediate print of the
-  string
 
 * The host variable in "new" can be undef. Fix the bug
 
@@ -72,13 +29,4 @@
 
 * Look how slow is package2.pl
 
-* NO SE SI ES FACTIBLE: Stdout y Stderr seran redirgidos a un proceso cada vez que una 
-  subrutina remota es llamada. El proceso prefija la salida 
-  con "STDOUT" y vuelca los contenidos en STDOUT y en un fichero
-  en modeo "tee".
 * 'put' and 'get' don't return result objects. Do they have to?
-* DEFERRED: Mimick traits: "exlusion" and "alias". Provide also a "does" method that returns true if
-  the machine knows the method
-* DEFERRED: Transfer of modules and later use 
-* DEFERRED: subandwrap 
-   Wraps in the local machine, "sub" in the remote

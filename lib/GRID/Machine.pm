@@ -23,7 +23,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.079";
+our $VERSION = "0.080";
 
 sub read_modules {
 
@@ -268,11 +268,11 @@ sub _get_result {
   my ($type, @result);
   { 
     ($type, @result) = $self->read_operation();
-    if ($type eq 'GPRINT') {
+    if ($type eq 'GRID::Machine::GPRINT') {
       print @result;
       redo;
     }
-    elsif ($type eq 'GPRINTF') {;
+    elsif ($type eq 'GRID::Machine::GPRINTF') {;
       printf @result;
       redo;
     }
