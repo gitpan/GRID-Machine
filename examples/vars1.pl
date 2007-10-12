@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 use strict;
-use GRID::Machine;
+use GRID::Machine qw(qc);
 
 my $machine = GRID::Machine->new(host => 'casiano@beowulf.pcg.ull.es');
 
@@ -9,8 +9,8 @@ $machine->eval(q{
   $h = [4..9]; 
 });
 
-my $r = $machine->eval(q{
-#line 14 "vars1.pl"
+my $r = $machine->eval(qc q{
   $h = [map {$_*$_} @$h];
 });
 
+die $r unless $r->noerr;

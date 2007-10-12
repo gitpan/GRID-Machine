@@ -80,6 +80,10 @@ is generated in the remote machine and served by the local machine.
 It is used when inmediate printing is required
 (see section L<Functions gprint and gprintf>)
 
+=item * C<GRID::Machine::CALLBACK>
+
+Used to implement callbacks
+
 =back 
 
 =head2 The C<SERVER> function
@@ -139,6 +143,56 @@ Syntax:
 
 Inside code to be executed on the remote machine we can use the function
 C<send_result> to send  results to the client
+
+=head1 EXTENDING THE PROTOCOL
+
+Let us see a simple example. We will extend the
+protocol with a new tag C<MYTAG>. 
+We have to write a module that will be used in the remote
+side of the link:
+
+  $ cat -n MyRemote.pm      
+     1  package GRID::Machine;
+     2  use strict;
+     3
+     4  sub MYTAG {
+     5    my ($server, $name) = @_;
+     6
+     7    $server->send_operation("RETURNED", "Hello $name!\n") if defined($name); 
+     8    $server->send_operation("DIED", "Error: Provide a name to greet!\n");
+     9  }
+    10
+    11  1;
+
+
+This component will be loaded on the remote machine via the ssh link.
+The name of the handling method C<MYTAG>
+must be the same than the name of the tag (operation type) used to send the request. 
+Here is a client program using the new tag:
+
+  $ cat -n extendprotocol.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $name = shift;
+     6  my $host = 'user@remote.machine';
+     7
+     8  my $machine = GRID::Machine->new(host => $host, remotelibs => [ qw(MyRemote) ]);
+     9
+    10  $machine->send_operation( "MYTAG", $name);
+    11  my ($type, $result) = $machine->read_operation();
+    12
+    13  die $result unless $type eq 'RETURNED';
+    14  print $result;
+
+
+When the program is executed we get the following output:
+
+                          $ extendprotocol.pl Larry
+                          Hello Larry!
+                          $ extendprotocol.pl
+                          Error: Provide a name to greet!
 
 =head1 INMEDIATE PRINTING: REMOTE DEBUGGING 
 
@@ -249,7 +303,8 @@ and for many years.
 
 I wish to thank Paul Evans for his C<IPC::PerlSSH> module: it was the source
 of inspiration for this module. To Dmitri Kargapolov for his contributions.
-Thanks also to Juana, Coro, my students at La Laguna and to the Perl Community. 
+To the perl monks, and the Perl Community for generously sharing their knowledge.
+Finally, thanks to Juana, Coro and  my students at La Laguna.
 
 =head1 LICENCE AND COPYRIGHT
  

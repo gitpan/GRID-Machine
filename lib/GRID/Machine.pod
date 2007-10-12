@@ -613,6 +613,37 @@ Now the execution produces the following output:
     Global symbol "$q" requires explicit package name at syntaxerr4.pl line 13, \
     <STDIN> line 32.
 
+However, if the code is moved from line 12 to other place we must change the C<#line> 
+pragma. This is inconvenient. Instead of hardcoding the line number
+use the C<qc> function instead:
+
+ $ cat -n syntaxerr5.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine qw(qc);
+     4  use Data::Dumper;
+     5
+     6  my $machine = GRID::Machine->new(host => 'casiano@orion.pcg.ull.es');
+     7
+     8  my $p = { name => 'Peter', familyname => [ 'Smith', 'Garcia'] };
+     9
+    10  my $r = $machine->eval( qc(q{
+    11      $q = shift;
+    12      $q->{familyname}
+    13    }), $p
+    14  );
+    15
+    16  die "$r" unless $r->ok;
+
+Now the execution of the program produces the following output:
+
+ $ syntaxerr5.pl
+  casiano@orion.pcg.ull.es: Error while compiling eval. \
+  Global symbol "$q" requires explicit package name at ./syntaxerr5.pl line 11, \
+  <STDIN> line 194.
+  Global symbol "$q" requires explicit package name at ./syntaxerr5.pl line 12, \
+  <STDIN> line 194.
+
 =head3 Scope and Visbility Issues
 
 Since the C<eval> method wraps the code into a subroutine 
@@ -623,29 +654,33 @@ Since the C<eval> method wraps the code into a subroutine
 variables declared using C<our> inside an C<eval> must be redeclared
 in subsequent C<evals> to make them visible. The following code produces an error message:
 
-  $ cat -n vars1.pl
+ $ cat -n vars1.pl
      1  #!/usr/local/bin/perl -w
      2  use strict;
-     3  use GRID::Machine;
+     3  use GRID::Machine qw(qc);
      4
-     5  my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
+     5  my $machine = GRID::Machine->new(host => 'user@remote');
      6
      7  $machine->eval(q{
      8    our $h;
      9    $h = [4..9];
     10  });
     11
-    12  my $r = $machine->eval(q{
-    13  #line 14 "vars1.pl"
-    14    $h = [map {$_*$_} @$h];
-    15  });
+    12  my $r = $machine->eval(qc q{
+    13    $h = [map {$_*$_} @$h];
+    14  });
+    15
+    16  die $r unless $r->noerr;
 
 
 The interpreter complains about C<$h>:
 
   $ vars1.pl
-  Variable "$h" is not imported at vars1.pl line 14, <STDIN> line 36.
-  Variable "$h" is not imported at vars1.pl line 14, <STDIN> line 36.
+  user@remote: Error while compiling eval. \
+    Global symbol "$h" requires explicit package name at ./vars1.pl line 13,\
+                                                           <STDIN> line 198.
+    Global symbol "$h" requires explicit package name at ./vars1.pl line 13, \
+                                                           <STDIN> line 198.
 
 
 The problem can be solved by redeclaring C<our $h> in the second C<eval> or changing
@@ -661,77 +696,74 @@ the declaration at line 8 by C<use vars>:
 One of the consequences of wrapping C<$code> inside a sub is that any
 lexical variable is limited to the scope of the C<eval>.
 Another is that nested subroutines inside C<$code> will live in
-a (involutary)  I<closure>. See the example:
+a (involuntary)  I<closure>. See the example:
 
   $ cat -n vars5.pl
      1  #!/usr/local/bin/perl -w
      2  use strict;
-     3  use GRID::Machine;
+     3  use GRID::Machine qw(qc);
      4
-     5  my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
+     5  my $machine = GRID::Machine->new(host => 'casiano@beowulf.pcg.ull.es');
      6
-     7  my $r = $machine->eval(q{
-     8  #line 9  "vars5.pl"
-     9    my $h = 1;
-    10
-    11    sub dumph {
-    12      print "$h";
-    13      $h++
-    14    }
-    15
-    16    dumph();
-    17  });
-    18
-    19  print "$r\n";
-    20
-    21  $r = $machine->eval(q{
-    22  #line 23  "vars5.pl"
-    23    dumph();
-    24  });
-    25
-    26  print "$r\n";
-
-
+     7  my $r = $machine->eval(qc q{
+     8    my $h = 1;
+     9
+    10    sub dumph {
+    11      print "$h\n";
+    12      $h++
+    13    }
+    14
+    15    dumph();
+    16  });
+    17
+    18  print "Result: ".$r->result."\nWarning: ".$r->stderr;
+    19
+    20  $r = $machine->eval(qc q{
+    21    dumph();
+    22  });
+    23
+    24  print "Result: ".$r->result."\nWarning: ".$r->stderr;
 
 When executed, the program produces the following warning:
 
   $ vars5.pl
-  Variable "$h" will not stay shared at vars5.pl line 12, <STDIN> line 32.
-  1
-  2
+  Result: 1
+  Warning: Variable "$h" will not stay shared at ./vars5.pl line 11\
+                                                 , <STDIN> line 194.
+  Result: 2
+  Warning: Variable "$h" will not stay shared at ./vars5.pl line 11,\
+                                                   <STDIN> line 194.
 
 The warning announces that later calls (in subsequent C<eval>s) to sub 
 C<dumph> can no longer reach C<$h> (Other than trhough C<dumph> itself).
-If you want lexical nested subroutines declare them thorugh a reference:
+If you want lexical nested subroutines declare them through a reference:
 
-  $ cat -n vars6.pl
+ $ cat -n vars6.pl
      1  #!/usr/local/bin/perl -w
      2  use strict;
-     3  use GRID::Machine;
+     3  use GRID::Machine qw(qc);
      4
-     5  my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
+     5  my $machine = GRID::Machine->new(host => 'casiano@beowulf.pcg.ull.es');
      6
-     7  my $r = $machine->eval(q{
-     8  #line 9  "vars6.pl"
-     9    my $h = 1;
-    10
-    11    use vars '$dumph';
-    12    $dumph = sub {
-    13      print "$h"; 
-    14      $h++;
-    15    };
-    16
-    17    $dumph->(); # Prints 1
-    18  });
-    19
-    20  print "$r\n";
-    21
-    22  $r = $machine->eval(q{
-    23  #line 24  "vars6.pl"
-    24    $dumph->(); # Prints 2
-    25  });
-    26
-    27  print "$r\n";
+     7  my $r = $machine->eval(qc q{
+     8    my $h = 1;
+     9
+    10    use vars '$dumph';
+    11    $dumph = sub {
+    12      print "$h";
+    13      $h++;
+    14    };
+    15
+    16    $dumph->();
+    17  });
+    18
+    19  print "$r\n";
+    20
+    21  $r = $machine->eval(qc q{
+    22    $dumph->();
+    23  });
+    24
+    25  print "$r\n";
 
 
 =head2 The C<compile> Method
@@ -865,7 +897,7 @@ method of the C<$machine> object within the local perl
 program. Therefore, two methods of two different C<GRID::Machine> objects with
 the same C<$name> are installed on different name spaces. See the example
 in section
-L<the constructor C<new>|"The Constructor new">
+L<The Constructor new>
 
 =head3 The C<filter> Argument
 
@@ -983,36 +1015,36 @@ when executed the program above produces:
 =head2 Aliasing
 
 Aliasing between parameters is correctly catched. The following code
-presents (line 25) a remote procedure call to a function C<iguales>
+presents (line 24) a remote procedure call to a function C<iguales>
 where the two local arguments C<$w> and C<$z> are the same:
 
-  $ cat -n alias.pl
+ $ cat -n alias.pl
      1  #!/usr/local/bin/perl -w
      2  use strict;
-     3  use GRID::Machine;
+     3  use GRID::Machine qw(qc);
      4
      5  my $machine = GRID::Machine->new(host => shift(), uses => [ 'Sys::Hostname' ]);
      6
-     7  my $r = $machine->sub( iguales => q{
-     8  #line 9 "alias.pl"
-     9      my ($first, $sec) = @_;
-    10
-    11      print hostname().": $first and $sec are ";
-    12
-    13      if ($first == $sec) {
-    14        print "the same\n";
-    15        return 1;
-    16      }
-    17      print "Different\n";
-    18      return 0;
-    19    },
-    20  );
-    21  $r->ok or die $r->errmsg;
-    22
-    23  my $w = [ 1..3 ];
-    24  my $z = $w;
-    25  $r = $machine->iguales($w, $z);
-    26  print $r;
+     7  my $r = $machine->sub( iguales => qc q{
+     8      my ($first, $sec) = @_;
+     9
+    10      print hostname().": $first and $sec are ";
+    11
+    12      if ($first == $sec) {
+    13        print "the same\n";
+    14        return 1;
+    15      }
+    16      print "Different\n";
+    17      return 0;
+    18    },
+    19  );
+    20  $r->ok or die $r->errmsg;
+    21
+    22  my $w = [ 1..3 ];
+    23  my $z = $w;
+    24  $r = $machine->iguales($w, $z);
+    25  print $r;
+
 
 when executed the program produces the following output:
 
@@ -1144,6 +1176,13 @@ of machine C<beowulf>:
 
 The negative answer for the second execution is due to the fact that no command
 called C<chum> is available on that machine.
+
+=head2 The Function C<qc>
+
+Prefixes the string passed as argument with the string C<#line $LINE $FILE> where C<$LINE>
+and C<$FILE> are the calling line and calling file respectively. Used to provide more accurate 
+error messages when evaluating remote code.
+See section L<Errors and Exceptions>.
 
 =head1 THE TRANSFERENCE OF FILES 
 
@@ -1740,6 +1779,10 @@ is generated in the remote machine and served by the local machine.
 It is used when inmediate printing is required
 (see section L<Functions gprint and gprintf>)
 
+=item * C<GRID::Machine::CALLBACK>
+
+Used to implement callbacks
+
 =back 
 
 =head2 The C<SERVER> function
@@ -1799,6 +1842,56 @@ Syntax:
 
 Inside code to be executed on the remote machine we can use the function
 C<send_result> to send  results to the client
+
+=head1 EXTENDING THE PROTOCOL
+
+Let us see a simple example. We will extend the
+protocol with a new tag C<MYTAG>. 
+We have to write a module that will be used in the remote
+side of the link:
+
+  $ cat -n MyRemote.pm      
+     1  package GRID::Machine;
+     2  use strict;
+     3
+     4  sub MYTAG {
+     5    my ($server, $name) = @_;
+     6
+     7    $server->send_operation("RETURNED", "Hello $name!\n") if defined($name); 
+     8    $server->send_operation("DIED", "Error: Provide a name to greet!\n");
+     9  }
+    10
+    11  1;
+
+
+This component will be loaded on the remote machine via the ssh link.
+The name of the handling method C<MYTAG>
+must be the same than the name of the tag (operation type) used to send the request. 
+Here is a client program using the new tag:
+
+  $ cat -n extendprotocol.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $name = shift;
+     6  my $host = 'user@remote.machine';
+     7
+     8  my $machine = GRID::Machine->new(host => $host, remotelibs => [ qw(MyRemote) ]);
+     9
+    10  $machine->send_operation( "MYTAG", $name);
+    11  my ($type, $result) = $machine->read_operation();
+    12
+    13  die $result unless $type eq 'RETURNED';
+    14  print $result;
+
+
+When the program is executed we get the following output:
+
+                          $ extendprotocol.pl Larry
+                          Hello Larry!
+                          $ extendprotocol.pl
+                          Error: Provide a name to greet!
 
 =head1 INMEDIATE PRINTING: REMOTE DEBUGGING 
 
@@ -1871,55 +1964,6 @@ were inmediately sent to C<STDOUT>.
 
 
 
-=head1 EXTENDING THE PROTOCOL
-
-Let us see a simple example. We will extend the
-protocol with a new tag C<MYTAG>. 
-We have to write a module that will be used in the remote
-side of the link:
-
-  $ cat -n MyRemote.pm      
-     1  package GRID::Machine;
-     2  use strict;
-     3
-     4  sub MYTAG {
-     5    my ($server, $name) = @_;
-     6
-     7    $server->send_operation("RETURNED", "Hello $name!\n") if defined($name); 
-     8    $server->send_operation("DIED", "Error: Provide a name to greet!\n");
-     9  }
-    10
-    11  1;
-
-
-This component will be loaded on the remote machine via the ssh link.
-The name of the handling method C<MYTAG>
-must be the same than the name of the tag (operation type) used to send the request. 
-Here is a client program using the new tag:
-
-  $ cat -n extendprotocol.pl
-     1  #!/usr/local/bin/perl -w
-     2  use strict;
-     3  use GRID::Machine;
-     4
-     5  my $name = shift;
-     6  my $host = 'user@remote.machine';
-     7
-     8  my $machine = GRID::Machine->new(host => $host, remotelibs => [ qw(MyRemote) ]);
-     9
-    10  $machine->send_operation( "MYTAG", $name);
-    11  my ($type, $result) = $machine->read_operation();
-    12
-    13  die $result unless $type eq 'RETURNED';
-    14  print $result;
-
-
-When the program is executed we get the following output:
-
-                          $ extendprotocol.pl Larry
-                          Hello Larry!
-                          $ extendprotocol.pl
-                          Error: Provide a name to greet!
 
 =head1 THE C<GRID::Machine::Result> CLASS
 
@@ -2127,6 +2171,252 @@ When we run the former example we get an ouput similar to this:
 See also the documentation in L<GRID::Machine::IOHandle> for more detailed 
 information.
 
+=head1 CALLBACKS
+
+It may happen that the local machine has installed a useful set of modules 
+that are not present on the remote side. It may be also imposible to transfer
+the modules to the remote machine using the mechanisms provided by 
+C<GRID::Machine>. In such situations -and many others - the I<callback>
+mechanism can be helpful to achieve the task at hand.
+
+The C<callback> method provides a way to make a subroutine on the local side
+callable from the remote side. The ideas and implementation mechanisms used 
+for  callbacks is the work of Dmitriy Kargapolov  (Thanks Dmitri!).
+
+The syntax is:
+
+                $r = $machine->callback( 'localsubname' );
+                $r = $machine->callback( localsub => sub { ... } );
+                $r = $machine->callback( localsub => subref );
+                $r = $machine->callback( sub { ... } );
+                $r = $machine->callback( subref );
+
+On success returns true, namely returns the address of the 
+subroutine on the remote side that works as I<proxy> of the 
+C<localsub> subroutine on the local side. 
+Exceptiomps will be thrown in case of failure.
+
+The following example shows a remote subroutine (lines 16-20)
+that calls a subroutine C<test_callback> 
+that will be executed on the local side (line 19). 
+The call to the method C<callback> at line 23 makes the 
+local subroutine C<test_callback> available from the remote side.
+
+ $ cat -n callbackbyname2.pl
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  use Sys::Hostname;
+     5
+     6  my $host = shift || $ENV{GRID_REMOTE_MACHINE};
+     7
+     8  sub test_callback {
+     9    print 'Inside test_callback(). Host is '.&hostname."\n";
+    10
+    11    return shift()+1;
+    12  }
+    13
+    14  my $machine = GRID::Machine->new(host => $host, uses => [ 'Sys::Hostname' ]);
+    15
+    16  my $r = $machine->sub( remote => q{
+    17      gprint hostname().": inside remote\n";
+    18
+    19      return 1+test_callback(2);
+    20  } );
+    21  die $r->errmsg unless $r->ok;
+    22
+    23  $r = $machine->callback( 'test_callback' );
+    24  die $r->errmsg unless $r->ok;
+    25
+    26  $r = $machine->remote();
+    27  die $r->errmsg unless $r->noerr;
+    28
+    29  print "Result: ".$r->result."\n";
+
+When the former program is executed (local machine is nereida) 
+we get an output similar to this:
+
+                $ callbackbyname2.pl
+                beowulf: inside remote
+                Inside test_callback(). Host is nereida.deioc.ull.es
+                Result: 4
+
+
+=head2 Callbacks and Namespaces
+
+The callback subroutine is somewhat exported onto the remote side.
+That is, when transforming a local subroutine in a callback 
+you can specify it by its full name (see line 24 below) but it is
+called from the remote side using its single name (line 18):
+
+  $ cat -n callbackbyname3.pl
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  use Sys::Hostname;
+     5
+     6  my $host = $ENV{GRID_REMOTE_MACHINE};
+     7
+     8  sub Tutu::test_callback {
+     9    print 'Inside test_callback() host: ' . &hostname . "\n";
+    10    return 3.1415;
+    11  }
+    12
+    13  my $machine = GRID::Machine->new(host => $host, uses => [ 'Sys::Hostname' ]);
+    14
+    15  my $r = $machine->sub( remote => q{
+    16      gprint hostname().": inside remote\n";
+    17
+    18      my $r = test_callback(); # scalar context
+    19
+    20      gprint hostname().": returned value from callback: $r\n";
+    21  } );
+    22  die $r->errmsg unless $r->ok;
+    23
+    24  $r = $machine->callback( 'Tutu::test_callback' );
+    25  die $r->errmsg unless $r->ok;
+    26
+    27  $r = $machine->remote();
+    28
+    29  die $r->errmsg unless $r->noerr;
+
+When executed the former program produces an output similar to this
+(beowulf is the remote machine):
+
+            $ callbackbyname3.pl
+            beowulf: inside remote
+            Inside test_callback() host: nereida.deioc.ull.es
+            beowulf: returned value from callback: 3.1415
+
+=head2 Context and Callbacks
+
+When a callback subroutine is called in a I<scalar context> it returns the 
+first element of the returned list. See line 18 in the previous code.
+
+=head2 Anonymous Callbacks
+
+The callback subroutine can be anonymous. The C<callback> method support the syntax: 
+
+              $machine->callback( sub { ... } )
+
+See an example:
+
+ $ cat -n anonymouscallback.pl
+     1  #!/usr/bin/perl
+     2  use strict;
+     3  use GRID::Machine;
+     4  use Sys::Hostname;
+     5
+     6  my $host = shift || $ENV{GRID_REMOTE_MACHINE};
+     7
+     8  my $machine = GRID::Machine->new(host => $host, uses => [ 'Sys::Hostname' ]);
+     9
+    10  my $r = $machine->sub( remote => q{
+    11      my $rsub = shift;
+    12
+    13      gprint &hostname.": inside remote sub\n";
+    14      my $retval = $rsub->(3);
+    15
+    16      return  1+$retval;
+    17  } );
+    18
+    19  die $r->errmsg unless $r->ok;
+    20
+    21  my $a =  $machine->callback(
+    22             sub {
+    23               print hostname().": inside anonymous inline callback. Args: (@_) \n";
+    24               return shift() + 1;
+    25             }
+    26           );
+    27
+    28  $r = $machine->remote( $a );
+    29
+    30  die $r->errmsg unless $r->noerr;
+    31
+    32  print "Result = ".$r->result."\n";
+
+When the previous example is executed using as local machine 'nereida'
+it produces an output similar to this:
+
+          $ anonymouscallback.pl
+          beowulf: inside remote sub
+          nereida.deioc.ull.es: inside anonymous inline callback. Args: (3)
+          Result = 5
+
+=head2 Recursive Remote Procedure Calls and Callbacks
+
+The existence of callbacks opens the possibility of nested sets of RPCs and 
+callbacks. The following example recursively computes the factorial of a number.
+The execution of recursive calls alternates between remote and local sides:
+
+  $ cat -n nestedcallback.pl
+     1  #!/usr/bin/perl
+     2  use strict;
+     3  use GRID::Machine;
+     4  use Sys::Hostname;
+     5
+     6  my $host = $ENV{GRID_REMOTE_MACHINE};
+     7
+     8  my $machine = GRID::Machine->new( host => $host, uses => [ 'Sys::Hostname' ] );
+     9
+    10  my $r = $machine->sub(
+    11    fact => q{
+    12      my $x = shift;
+    13
+    14      gprint &hostname . ": fact($x)\n";
+    15
+    16      if ($x > 1) {
+    17        my $r = localfact($x-1);
+    18        return $x*$r;
+    19      }
+    20      else {
+    21        return 1;
+    22      }
+    23    }
+    24  );
+    25  die $r->errmsg unless $r->ok;
+    26
+    27  $r = $machine->callback(
+    28
+    29      localfact => sub {
+    30        my $x = shift;
+    31
+    32        print &hostname . ": fact($x)\n";
+    33
+    34        if ($x > 1) {
+    35          my $r = $machine->fact($x-1)->result;
+    36          return $x*$r;
+    37        }
+    38        else {
+    39          return 1;
+    40        }
+    41
+    42      }
+    43
+    44  );
+    45  die $r->errmsg unless $r->ok;
+    46
+    47  my $n = shift;
+    48
+    49  $r = $machine->fact($n);
+    50
+    51  die $r->errmsg unless $r->ok;
+    52  print "=============\nfact($n) is ".$r->result."\n";
+
+When executed, the former program produces an output similar to this (beowulf is the remote
+machine):
+
+                      $ nestedcallback.pl 6
+                      beowulf: fact(6)
+                      nereida.deioc.ull.es: fact(5)
+                      beowulf: fact(4)
+                      nereida.deioc.ull.es: fact(3)
+                      beowulf: fact(2)
+                      nereida.deioc.ull.es: fact(1)
+                      =============
+                      fact(6) is 720
+
+
 =head1 EXAMPLE: RUNNING DISTRIBUTION TESTS ON REMOTE MACHINES
 
 The following script C<examples/remotetest.pl> loads a CPAN distribution
@@ -2299,13 +2589,16 @@ of writing). It obviously can't parse everything. But works for most of the code
 
 =head1 EXPORTS
 
-When explicited by the client program it exports these functions:
+When explicited by the client program C<GRID::Machine>
+exports these functions:
 
 =over 2
 
 =item * C<is_operative> 
 
 =item * C<read_modules>
+
+=item * C<qc>
 
 =back
 
@@ -2334,7 +2627,9 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
 
 =over 2 
 
-=item * Dmitriy Kargapolov 
+=item * Dmitriy Kargapolov (<dmitriy.kargapolov@gmail.com>)
+suggested, designed and provided an implementation 
+for callbacks. Many thanks Dmitry.
 
 =back
 
@@ -2355,7 +2650,8 @@ and for many years.
 
 I wish to thank Paul Evans for his C<IPC::PerlSSH> module: it was the source
 of inspiration for this module. To Dmitri Kargapolov for his contributions.
-Thanks also to Juana, Coro, my students at La Laguna and to the Perl Community. 
+To the perl monks, and the Perl Community for generously sharing their knowledge.
+Finally, thanks to Juana, Coro and  my students at La Laguna.
 
 =head1 LICENCE AND COPYRIGHT
  

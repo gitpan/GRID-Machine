@@ -1,11 +1,10 @@
 #!/usr/local/bin/perl -w
 use strict;
-use GRID::Machine;
+use GRID::Machine qw(qc);
 
 my $machine = GRID::Machine->new(host => 'casiano@beowulf.pcg.ull.es');
 
-my $r = $machine->eval(q{
-#line 9  "vars3.pl"
+my $r = $machine->eval(qc q{
   my $h = 1;
 
   use vars '$dumph';
@@ -19,8 +18,7 @@ my $r = $machine->eval(q{
 
 print "$r\n";
 
-$r = $machine->eval(q{
-#line 24  "vars3.pl"
+$r = $machine->eval(qc q{
   $dumph->();
 });
 

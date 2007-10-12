@@ -1,14 +1,10 @@
 #!/usr/local/bin/perl -w
 use strict;
-use GRID::Machine;
+use GRID::Machine qw(qc);
 
-my $machine = GRID::Machine->new(
-                   host => shift() || $ENV{GRID_REMOTE_MACHINE}, 
-                   uses => [ 'Sys::Hostname' ]
-              );
+my $machine = GRID::Machine->new(host => shift(), uses => [ 'Sys::Hostname' ]);
 
-my $r = $machine->sub( iguales => q{
-#line 12 "alias.pl"
+my $r = $machine->sub( iguales => qc q{
     my ($first, $sec) = @_;
 
     print hostname().": $first and $sec are ";

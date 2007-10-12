@@ -9,6 +9,9 @@ t/01synopsis.t
 t/02pod.t
 t/03includes.t
 t/05podcoverage.t
+t/06callbacks.t
+t/07anonymouscallback2.t
+t/08callbackbyname.t
 t/Include2.pm
 t/Include.pm
 lib/GRID/Machine.pm
@@ -117,4 +120,11 @@ examples/testrem.pm
 examples/copyandmkdir.pl
 examples/noerrvsok.pl
 examples/gprint.pl
+examples/nestedcallback.pl
+examples/anonymouscallback.pl
+examples/callbackbyname2.pl
+examples/callbackbyname3.pl
+examples/callbackbyname.pl
+examples/anonymouscallback2.pl
+examples/callbackbyname_err1.pl
 META.yml                                 Module meta-data (added by MakeMaker)

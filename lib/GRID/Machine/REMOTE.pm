@@ -27,7 +27,7 @@ sub send_result {
   $arg{stdout} =  '' unless defined($arg{stdout});
   $arg{stderr} =  '' unless defined($arg{stderr});
   $arg{errmsg} =  '' unless defined($arg{errmsg});
-  $arg{results} =  [] unless defined($arg{errmsg});
+  $arg{results} =  [] unless defined($arg{results});
   $server->send_operation( "RETURNED", GRID::Machine::Result->new( %arg ));
 }
 
@@ -35,18 +35,26 @@ sub send_result {
 
   # List of legal attributes
   my @legal = qw(
-    log err 
-    readfunc writefunc 
-    cleanup sendstdout
-    host command
+    cleanup 
+    clientpid
+    command
+    Deparse
+    err 
+    errfile 
+    host 
+    Indent 
+    log 
+    logfile 
     perl
-    startdir startenv
-    pushinc unshiftinc
     prefix
-    Indent Deparse
+    pushinc 
+    readfunc 
+    sendstdout
+    startdir 
+    startenv
     stored_procedures
-    SAVEOUT
-    SAVEERR
+    unshiftinc
+    writefunc 
   );
   my %legal = map { $_ => 1 } @legal;
 
@@ -62,9 +70,11 @@ sub send_result {
     my $class = shift;
     my %args = @_;
 
+    # Dummy variable $legal. Just to make the perl compiler conscious of the closure ...
+    my $legal = \%legal; 
     my $die = 0;
-    my $a = "";
-    $die  = "Illegal arg  $a\n" if $a = first { !exists $legal{$_} } keys(%args);
+    my $a = first { !exists $legal{$_} } keys(%args);
+    die("Error in remote new: Illegal arg  $a. Legal args: @legal\n") if $a;
 
 
     # TRUE if remote stdout is sent back to local
@@ -73,20 +83,6 @@ sub send_result {
     # TRUE if temporary files will be deleted
     my $cleanup = $args{cleanup};
     $cleanup = 1 unless defined($cleanup);
-
-    my $readfunc = sub {
-       if( defined $_[1] ) {
-          read( STDIN, $_[0], $_[1] );
-       }
-       else {
-          $_[0] = <STDIN>;
-          length $_[0];
-       }
-    };
-
-    my $writefunc = sub {
-       print STDOUT $_[0];
-    };
 
     #my ($sysname, $nodename, $release, $version, $machine) = POSIX::uname();
     my $host = $args{host}; # ||  $nodename;
@@ -115,16 +111,23 @@ sub send_result {
 
     my $clientpid = $args{clientpid} || $$;
 
-    # Create it if it does not exist? (the directories I mean)
-    # What if it is absolute?
-    
-    $args{log} = "rperl$clientpid.log" unless $args{log};
-    my $log = "$ENV{HOME}/$args{log}";
-    open my $logfile, "> $log" or $die = 1;
+    # create copy of STDOUT to use as command output (-dk-)
+    open(my $CMDOUT, ">&STDOUT") or die;
+    $CMDOUT->autoflush(1);
 
-    $args{err} = "rperl$clientpid.err" unless $args{err};
-    my $err = "$ENV{HOME}/$args{err}";
-    open my $errfile, "> $err" or $die = 1;
+    my $readfunc = sub {
+       if( defined $_[1] ) {
+          read( STDIN, $_[0], $_[1] );
+       }
+       else {
+          $_[0] = <STDIN>;
+          length $_[0];
+       }
+    };
+
+    my $writefunc = sub {
+       print $CMDOUT $_[0];
+    };
 
     my $prefix = $args{prefix} || "$ENV{HOME}/perl5lib";
     mkdir $prefix unless -r $prefix; 
@@ -134,17 +137,13 @@ sub send_result {
 
     my $handler = {
 
-      Indent  => 2,
-      Deparse => 1,
+      #Indent  => 2,
+      #Deparse => 1,
 
       sendstdout => $sendstdout,
       readfunc => $readfunc,
       writefunc => $writefunc,
       host  => $host,
-      log      => $log,
-      logfile  => $logfile,
-      err      => $err,
-      errfile  => $errfile,
       cleanup  => $cleanup,
       prefix   => $prefix,
       clientpid => $clientpid, 
@@ -155,6 +154,39 @@ sub send_result {
 
     $SERVER = bless $handler, $class;
 
+    # Create it if it does not exist? (the directories I mean)
+    # What if it is absolute?
+
+    $args{log} = "rperl$clientpid.log" unless $args{log};
+    my $log = "$ENV{HOME}/$args{log}";
+    open my $logfile, "> $log" or do {
+        $SERVER->send_error("Can't open $log for writing. $@");
+        return $SERVER
+    };
+    $SERVER->{log} = $log;
+    $SERVER->{logfile} = $logfile;
+
+    # redirect STDOUT - once per remote session! (-dk-)
+    open(STDOUT,"> $SERVER->{log}") or do {
+        $SERVER->send_error("Can't redirect stdout. $@");
+        return $SERVER
+    };
+
+    $args{err} = "rperl$clientpid.err" unless $args{err};
+    my $err = "$ENV{HOME}/$args{err}";
+    open my $errfile, "> $err" or do {
+        $SERVER->send_error("Can't open $err for writing. $@");
+        return $SERVER
+    };
+    $SERVER->{err} = $err;
+    $SERVER->{errfile} = $errfile;
+
+    # redirect STDERR - once per remote session! (-dk-)
+    open(STDERR,"> $SERVER->{err}") or do {
+        $SERVER->send_error("Can't redirect stderr. $@");
+        return $SERVER
+    };
+
     return $SERVER;
   }
 } # end closure
@@ -162,38 +194,12 @@ sub send_result {
 sub QUIT {  
     my $server = shift;
 
-    wait; # for filter
     $server->send_operation( "RETURNED");
     exit( 0 ) 
 }
 
-sub save_and_open_stdfiles {
+sub read_stdfiles {
   my $server = shift;
-
-  my $log = $server->{log};
-  my $err = $server->{err};
-  my ($SAVEOUT, $SAVEERR);
-
-  open($SAVEOUT, ">&", STDOUT) or return 0; # or die ...
-  open(STDOUT,"> $log") or return 0;     # or die ..
-
-  open($SAVEERR, ">&", STDERR) or return 0; # or die ...
-  open(STDERR,"> $err") or return 0;     # or die ..
-
-  $server->{SAVEOUT} = $SAVEOUT;
-  $server->{SAVEERR} = $SAVEERR;
-
-  return 1;
-}
-
-sub read_and_reset_stdfiles {
-  my $server = shift;
-
-  my $SAVEOUT = $server->{SAVEOUT};
-  my $SAVEERR = $server->{SAVEERR};
-
-  open(STDOUT, ">&", $SAVEOUT);
-  open(STDERR, ">&", $SAVEERR);
 
   my $sendstdout = $server->{sendstdout};
 
@@ -214,17 +220,17 @@ sub read_and_reset_stdfiles {
   return ($rstdout, $rstderr);
 }
 
-sub redirect_and_eval {
+sub eval_and_read_stdfiles {
   my $server = shift;
   my $subref = shift;
-
-    $server->save_and_open_stdfiles 
-  or return GRID::Machine::Result->new(errmsg => "Can't redirect stdout and stderr");
 
       my @results = eval { $subref->( @_ ) };
 
   my $err = $@;
-  my @output = $server->read_and_reset_stdfiles;
+  my @output = $server->read_stdfiles;
+
+    # handling 'GRID::Machine::QUIT' when waiting for 'RESULT' from callback (-dk-)
+    if ($err =~ /^EXIT/) { undef $@; exit 0 }
 
     return GRID::Machine::Result->new(errmsg => "Can't recover stdout and stderr")
   unless @output;
@@ -249,7 +255,7 @@ sub EVAL {
      return;
   }
 
-  my $results = $server->redirect_and_eval($subref, @$args) ;
+  my $results = $server->eval_and_read_stdfiles($subref, @$args) ;
 
   if( $@ ) {
      $code =~ m{(.*)};
@@ -292,6 +298,58 @@ sub STORE {
   return;
 }
 
+# -dk-
+sub make_callback {
+   my ($server, $name) = splice @_,0,2;
+
+   return sub {
+      $server->send_operation('CALLBACK', $name, @_);
+
+      while (1) {
+         my ($op, @args) = $server->read_operation();
+
+         # what we actually expected - 'RESULT'
+         if ($op eq 'RESULT') {
+           return wantarray ? @args : $args[0];
+         }
+
+         # special case - 'QUIT'
+         if ($op eq 'GRID::Machine::QUIT') {
+            $server->send_operation("RETURNED");
+            # we're inside eval so have to pass 'exit' up
+            die "EXIT"
+         }
+
+         if ($server->can($op)) {
+            $server->$op(@args);
+            next
+         }
+
+         die "RESULT expected, '$op' received...\n"
+      }
+   }
+}
+
+# -dk-
+sub CALLBACK {
+   my ($server, $name) = splice @_,0,2;
+
+   # Don't overwrite existing methods
+   my $class = ref($server);
+   if ($class->can($name)) {
+      $server->send_error("Machine $server->{host} already has a method $name");
+      return;
+   };
+
+   my $callback = make_callback($server, $name);
+   {
+     no strict 'refs';
+     *{$class."::$name"} = $callback;
+   }
+
+   $server->send_result( results => [ 0+$callback ] );
+}
+
 sub EXISTS {
   my $server = shift;
   my $name = shift;
@@ -313,7 +371,10 @@ sub CALL {
      return;
   }
 
-  my $results = redirect_and_eval($server, $subref, @$args );
+  # -dk- look for anonymous callback(s)
+  my $results = eval_and_read_stdfiles($server, $subref, map(
+      UNIVERSAL::isa($_, 'GRID::Machine::_RemoteStub') ? make_callback($server, $_->{id}) : $_,
+  @$args ) );
 
   if( $@ ) {
      $server->send_error("Error running sub $name: $@");
@@ -362,18 +423,7 @@ sub MODPUT {
 # Goes in reverse: The remote makes the request the local 
 # serves the request
 sub gprint {
-   my $wf = SERVER->writefunc;
-   my $SAVEOUT = SERVER->{SAVEOUT};
-
-   SERVER->writefunc( sub { syswrite $SAVEOUT, $_[0] });
-
-   #$Data::Dumper::Deparse = 1;
-   #print Dumper SERVER;
-
    SERVER->send_operation('GRID::Machine::GPRINT', @_);
-
-   SERVER->writefunc( $wf );
-   # Don't wait for answer?
    return 1;
 }
 
@@ -382,15 +432,7 @@ sub gprint {
 # Goes in reverse: The remote makes the request, the local 
 # serves the request
 sub gprintf {
-   my $wf = SERVER->writefunc;
-   my $SAVEOUT = SERVER->{SAVEOUT};
-
-   SERVER->writefunc( sub { syswrite $SAVEOUT, $_[0] });
-
    SERVER->send_operation('GRID::Machine::GPRINTF', @_);
-
-   SERVER->writefunc( $wf );
-   # Don't wait for answer?
    return 1;
 }
 
@@ -426,16 +468,37 @@ sub main() {
   # Create filter process
   # Check $server is a GRID::Machine
 
+  {
+  package main;
   while( 1 ) {
      my ( $operation, @args ) = $server->read_operation( );
 
      if ($server->can($operation)) {
        $server->$operation(@args);
+
+       # Outermost CALL Should Reset Redirects (-dk-)
+       next unless $operation eq 'GRID::Machine::CALL';
+       if ($server->{log}) {
+         close STDOUT;
+         $server->{log} and open(STDOUT,"> $server->{log}") or do {
+           $server->send_error("Can't redirect stdout. $@");
+           last
+         }
+       }
+       if ($server->{err}) {
+         close STDERR;
+         $server->{err} and open(STDERR,"> $server->{err}") or do {
+           $server->send_error("Can't redirect stderr. $@");
+           last
+         }
+       }
+
        next;
      }
 
      $server->send_error( "Unknown operation $operation\nARGS: @args\n" );
   }
+  } # package
 }
 
 package GRID::Machine::RemoteSub;

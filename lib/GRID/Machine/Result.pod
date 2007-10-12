@@ -154,7 +154,8 @@ and for many years.
 
 I wish to thank Paul Evans for his C<IPC::PerlSSH> module: it was the source
 of inspiration for this module. To Dmitri Kargapolov for his contributions.
-Thanks also to Juana, Coro, my students at La Laguna and to the Perl Community. 
+To the perl monks, and the Perl Community for generously sharing their knowledge.
+Finally, thanks to Juana, Coro and  my students at La Laguna.
 
 =head1 LICENCE AND COPYRIGHT
  

@@ -1,7 +1,31 @@
-* Documentation
+* Define functions "greadline" that - when executed on the remote side - reads from the local 
+side
+
+* Define GRID::Machine::LIOHandle objects as files on the local side that are accesible from the remote side.
+  I.e. s.t. like:
+
+   my $r = $m->sub { tutu => q{
+                       my $f = GRID::Machine::LIOHandle->new("titi.txt");
+                       my $x = <$f>;
+                       gprint $x;
+                     }
+                   }
+
+* trace : trace communications
+#  sub traceop {
+#    my $self = shift;
+#    if (@_) {
+#      my $traceop = shift;
+#      $self->eval('SERVER->traceop( shift() );', $traceop);
+#      $self->{traceop} = $traceop;
+#    }
+#    return $self->{traceop};
+#  }
+
+
 * Tests
-     rw-r--r--   1 casiano casiano            0 2007-07-21 13:10 rperl$$.log
-    -rw-r--r--   1 casiano casiano            0 2007-07-21 13:10 rperl$$.err
+
+* Documentation
 
 * Method "call" must specify the context: if scalar or list. Important for IO.
 
@@ -21,12 +45,7 @@
 
 * The host variable in "new" can be undef. Fix the bug
 
-* $die in REMOTE.pm inside new is never used 
-   Each request to the remote perl sever must be followed
-   by a check of its correctness
-
 * Make code Operating System independent. is_operative rewrite
 
 * Look how slow is package2.pl
 
-* 'put' and 'get' don't return result objects. Do they have to?

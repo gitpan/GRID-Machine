@@ -30,7 +30,9 @@ my @files = (
 #  'examples/MyRemote.pm',
 #  'examples/extendprotocol.pl',
 #  'examples/synopsis',1'.pl',
-   'examples/gprint.pl',
+#  'examples/gprint.pl',
+#  'examples/nestedcallback.pl',
+#  'examples/salida',
 );
 return <<"EOT";
 doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2

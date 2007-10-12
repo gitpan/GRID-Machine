@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 use strict;
-use Test::More tests => 9;
+use Test::More tests => 6;
 BEGIN { use_ok('GRID::Machine', 'is_operative') };
 
 my $test_exception_installed;
@@ -14,7 +14,7 @@ my $host = $ENV{GRID_REMOTE_MACHINE};
 
 my $machine;
 SKIP: {
-    skip "Remote not operative or Test::Exception not installed", 8
+    skip "Remote not operative or Test::Exception not installed", 5
   unless $test_exception_installed and $host and is_operative('ssh', $host);
 
 ########################################################################
@@ -25,15 +25,24 @@ SKIP: {
 
 ########################################################################
 
-  unshift @INC, "t/";
-  $machine->include("Include");
+sub test_callback {
+  return shift()+1;
+} 
 
-  for my $method (qw(one two three)) {
-    can_ok($machine, $method);
-    is($machine->$method()->stdout, "$method\n", "and works");
-  }
+my $machine = GRID::Machine->new(host => $host);
 
-  ok(!$machine->can('four'), "DATA filehandle is correctly skipped");
+my $r = $machine->sub( remote => q{
+    return 1+test_callback(2);
+} );
+ok($r->ok, "remote sub installed");
+
+$r = $machine->callback( 'test_callback' );
+ok($r->ok, "callback made of named local sub"); 
+
+$r = $machine->remote();
+ok($r->noerr, "no errors on RPC");
+
+is($r->result, 4, "result from RPC and named callback");
 
 } # end SKIP block
 

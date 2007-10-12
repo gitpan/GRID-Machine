@@ -16,14 +16,14 @@ use base qw(Exporter);
 use GRID::Machine::IOHandle;
 require Cwd;
 no Cwd;
-our @EXPORT_OK = qw(is_operative read_modules);
+our @EXPORT_OK = qw(is_operative read_modules qc);
 
 # We need to include the common shared perl library
 use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.080";
+our $VERSION = "0.081";
 
 sub read_modules {
 
@@ -54,20 +54,40 @@ sub read_modules {
 { # closure for attributes
 
   my @legal = qw(
-    log err wait ssh scp 
-    readfunc writefunc cleanup sendstdout
-    host command
-    perl
-    uses
+    cleanup 
+    command
+    err 
+    host 
     includes
-    remotelibs
-    startdir startenv 
+    log 
+    perl
+    prefix 
     pushinc unshiftinc
-    prefix
+    readfunc 
+    remotelibs
+    scp 
+    sendstdout
+    ssh 
+    startdir startenv 
+    uses
+    wait 
+    writefunc 
   );
   my %legal = map { $_ => 1 } @legal;
 
+#  sub traceop {
+#    my $self = shift;
+#    if (@_) {
+#      my $traceop = shift;
+#      $self->eval('SERVER->traceop( shift() );', $traceop);
+#      $self->{traceop} = $traceop;
+#    }
+#    return $self->{traceop};
+#  }
+
   GRID::Machine::MakeAccessors::make_accessors(@legal);
+
+# push @legal, 'traceop';
 
   sub RemoteProgram {
     my ($USES,
@@ -82,7 +102,8 @@ sub read_modules {
         $unshiftinc, 
         $sendstdout, 
         $cleanup, 
-        $prefix) 
+        $prefix,
+       ) 
     = @_;
 
    return << "EOREMOTE";
@@ -221,7 +242,7 @@ EOREMOTE
          $unshiftinc, 
          $sendstdout, 
          $cleanup, 
-         $prefix
+         $prefix,
        ) 
      );
 
@@ -296,7 +317,7 @@ sub compile {
    my $self = shift;
    my $name = shift;
 
-   die "Illegal name. Full names aren't allowed\n" unless $name =~ m{[a-zA-Z_]\w*};
+   die "Illegal name. Full names aren't allowed\n" unless $name =~ m{^[a-zA-Z_]\w*$};
 
    $self->send_operation( "GRID::Machine::STORE", $name, @_ );
 
@@ -340,6 +361,50 @@ sub sub {
    };
 
    return $ok;
+}
+
+# -dk- modified by Casiano
+#  $m->callback( 'tutu' );
+#  $m->callback( tutu => sub { ... } );
+#  $m->callback( sub { ... } );
+sub callback {
+   my $self = shift;
+   my $name = shift;
+   my $cref = shift;
+
+
+   if (UNIVERSAL::isa($name, 'CODE')) {
+     my $id = 0+$name; 
+     $self->{callbacks}->{$id} = $name;
+     return bless { id => $id }, 'GRID::Machine::_RemoteStub';
+   }
+
+   die "Error: Illegal name for callback: $name\n" unless $name =~ m{^[a-zA-Z_:][\w:]*$};
+
+   if (UNIVERSAL::isa($cref, 'CODE')) {
+     $self->{callbacks}->{$name} = $cref;
+   }
+   else {
+     my $fullname;
+     if ($name =~ /^.*::(\w+)$/) {
+       $fullname = $name;
+       $name = $1;
+     }
+     else {
+       $fullname = caller()."::$name";
+     }
+
+     {
+       no strict 'refs';
+       $self->{callbacks}->{$name} = *{$fullname}{CODE};
+     }
+
+       die "Error building callback $fullname: Not a CODE ref\n" 
+     unless UNIVERSAL::isa($self->{callbacks}->{$name}, 'CODE');
+   }
+   $self->send_operation( "GRID::Machine::CALLBACK", $name);
+
+   return $self->_get_result( );
 }
 
 ##############################################################################
@@ -479,9 +544,52 @@ sub call
    #my ( $name, @args ) = @_;
    my $name = shift;
 
+   # id-list of anonymous inline callback stubs (-dk-)
+   my @ids;
+   foreach my $a (@_) {
+      push @ids, $a->{id} if UNIVERSAL::isa($a, 'GRID::Machine::_RemoteStub')
+   }
    $self->send_operation( "GRID::Machine::CALL", $name, \@_ );
 
-   return $self->_get_result();
+   my $result = $self->_get_result_or_callback(@ids); # -dk-
+
+   # cleanup (-dk-) See examples/anonymouscallback2.pl
+   #foreach my $id (@ids) {
+   #   delete $self->{callbacks}->{$id}
+   #}
+
+   return $result;
+}
+
+# -dk-
+sub _get_result_or_callback {
+  my $self = shift;
+
+  my ($type, @list);
+  {
+    @list = $self->read_operation();
+    $type = shift @list;
+    if ($type eq 'GRID::Machine::GPRINT') {
+      print @list;
+
+      redo;
+    }
+    if ($type eq 'GRID::Machine::GPRINTF') {;
+      printf @list;
+
+      redo;
+    }
+    if ($type eq 'CALLBACK') {
+      my $name = shift @list;
+      # FIXME: eval callback to catch and propagate exceptions
+      $self->send_operation('RESULT', $self->{callbacks}->{$name}->(@list));
+      redo;
+    }
+  }
+  my $result = shift @list;
+  $result->type($type) if blessed($result) and $result->isa('GRID::Machine::Result');
+
+  return $result; # void context
 }
 
 # True if machine accepts automatic ssh connections 
@@ -518,7 +626,7 @@ sub put {
   }
 
   # Warning: bug. "host" may be is not defined!!!!!!!!!!
-  my $host = $self->{host};
+  my $host = $self->host;
   die "put error: host is not defined\n" unless defined($host);
 
   my $scp = $self->{scp};
@@ -539,7 +647,7 @@ sub get {
   my $dest = shift || Cwd::getcwd();
 
   #Warning: bug. host may be is not defined!!!!!!!!!!
-  my $host = $self->{host};
+  my $host = $self->host;
   die "put error: host is not defined\n" unless defined($host);
 
   my $scp = $self->{scp};
@@ -643,12 +751,21 @@ sub DESTROY {
 
    my $ret = $self->_get_result( );
 
-       warn "Remote host ".$self->{host}
+       warn "Remote host ".$self->host
            ." threw an exception while quitting"
            .$ret->errmsg
    if blessed($ret) && ( $ret->type eq "DIED" );
 
    waitpid $self->{pid}, 0 if defined $self->{pid};
+}
+
+sub qc {
+   my ($package, $filename, $line) = caller;
+   return <<"EOI";
+
+#line $line $filename
+@_
+EOI
 }
 
 1;

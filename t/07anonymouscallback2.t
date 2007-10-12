@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 use strict;
-use Test::More tests => 9;
+use Test::More tests => 6;
 BEGIN { use_ok('GRID::Machine', 'is_operative') };
 
 my $test_exception_installed;
@@ -14,7 +14,7 @@ my $host = $ENV{GRID_REMOTE_MACHINE};
 
 my $machine;
 SKIP: {
-    skip "Remote not operative or Test::Exception not installed", 8
+    skip "Remote not operative or Test::Exception not installed", 5
   unless $test_exception_installed and $host and is_operative('ssh', $host);
 
 ########################################################################
@@ -25,15 +25,26 @@ SKIP: {
 
 ########################################################################
 
-  unshift @INC, "t/";
-  $machine->include("Include");
+my $r = $machine->sub( remote => q{
+    my $rsub = shift;
 
-  for my $method (qw(one two three)) {
-    can_ok($machine, $method);
-    is($machine->$method()->stdout, "$method\n", "and works");
-  }
+    my $retval = $rsub->();
+    return  1+$retval;
+} );
 
-  ok(!$machine->can('four'), "DATA filehandle is correctly skipped");
+ok($r->ok, "installed remote sub");
+
+my $a =  $machine->callback( 
+           sub { return 5; } 
+         );
+
+$r = $machine->remote( $a );
+ok($r->noerr, "No errors not died on call to remote sub");
+
+$r = $machine->remote( $a );
+ok($r->noerr, "Twice: No errors not died on call to remote sub");
+
+is($r->result, 6, "returned value from anonymous callback");
 
 } # end SKIP block
 
