@@ -88,12 +88,12 @@ To install this module, follow these two steps:
 
 =over 2
 
-=item  * Set automatic ssh-authentification with a machine where you have an account.
+=item  * Set automatic ssh-authentication with a machine where you have an account.
 
 SSH includes the ability to authenticate users using public keys. Instead of 
 authenticating the user with a password, the SSH server on the remote machine will
 verify a challenge signed by the user's I<private key> against its copy
-of the user's I<publick key>. To achieve this automatic ssh-authentification
+of the user's I<publick key>. To achieve this automatic ssh-authentication
 you have to:
 
 =item * Generate a public key use the C<ssh-keygen> utility. For example:
@@ -264,7 +264,7 @@ When executed the former program will produce an output similar to this:
 The constructor doesn't return on failure:
 It raises an exception if the connection can't be 
 established. 
-See the result of an attempt to connect to a machine when there is no automatic authentification:
+See the result of an attempt to connect to a machine when there is no automatic authentication:
 
   $ perl -MGRID::Machine -e " GRID::Machine->new( host => 'user@not.available')"
   ssh: connect to host not.available port 22: No route to host
@@ -2630,6 +2630,10 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
 =item * Dmitriy Kargapolov (<dmitriy.kargapolov@gmail.com>)
 suggested, designed and provided an implementation 
 for callbacks. Many thanks Dmitry.
+
+=item * Eric Busto fixed a 
+problem with C<is_operative> hanging on systems that are in an
+odd state. 
 
 =back
 

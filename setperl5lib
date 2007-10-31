@@ -2,7 +2,7 @@
 # to be used inside the tests (make test).
 # Automatic ssh authentification with GRID_REMOTE_MACHINE
 # is assumed
-#export GRID_REMOTE_MACHINE=casiano@orion.pcg.ull.es
-export GRID_REMOTE_MACHINE=casiano@beowulf.pcg.ull.es
+export GRID_REMOTE_MACHINE=casiano@orion.pcg.ull.es
+#export GRID_REMOTE_MACHINE=casiano@beowulf.pcg.ull.es
 export PERL5LIB=`pwd`/lib
 export DISPLAY=:0.0
