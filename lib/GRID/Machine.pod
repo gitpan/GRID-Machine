@@ -126,7 +126,7 @@ If the C<ssh-copy-id> script is available, you can do it using:
 
 Alternatively you can write the following command:
 
-  $ ssh remote.machine "umask 077; cat >> .ssh/authorized_keys" < home/user/.ssh/id_rsa.pub
+  $ ssh remote.machine "umask 077; cat >> .ssh/authorized_keys" < /home/user/.ssh/id_rsa.pub
 
 The C<umask> command is needed since the SSH server will refuse to 
 read a C<home/user/.ssh/authorized_keys> files which have loose permissions.

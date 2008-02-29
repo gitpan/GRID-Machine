@@ -245,9 +245,33 @@ sub eval_and_read_stdfiles {
   );
 }
 
+#sub EVAL {
+#  my ($server, $code, $args) = @_;
+#  
+#  my $subref = eval "use strict; sub { $code }";
+#
+#  if( $@ ) {           # Error while compiling code
+#     $server->send_error("Error while compiling eval. $@");
+#     return;
+#  }
+#
+#  my $results = $server->eval_and_read_stdfiles($subref, @$args) ;
+#
+#  if( $@ ) {
+#     $code =~ m{(.*)};
+#     $server->send_error( 
+#       "Error running eval code $1. $@"
+#     );
+#     return;
+#  }
+#
+#  $server->send_operation( "RETURNED", $results );
+#  return;
+#}
+
 sub EVAL {
   my ($server, $code, $args) = @_;
-  
+
   my $subref = eval "use strict; sub { $code }";
 
   if( $@ ) {           # Error while compiling code
@@ -255,7 +279,17 @@ sub EVAL {
      return;
   }
 
-  my $results = $server->eval_and_read_stdfiles($subref, @$args) ;
+  if ( defined($args) && !UNIVERSAL::isa($args, 'ARRAY')) {
+     $server->send_error( "Error in eval. Args expected. Found instead: $args" );
+     return;
+  }
+
+  # -dk- look for anonymous callback(s)
+  my $results = eval_and_read_stdfiles(
+      $server, 
+      $subref, 
+      map( UNIVERSAL::isa($_, 'GRID::Machine::_RemoteStub') ?  make_callback($server, $_->{id}) : $_, @$args ) 
+  );
 
   if( $@ ) {
      $code =~ m{(.*)};
@@ -477,7 +511,7 @@ sub main() {
        $server->$operation(@args);
 
        # Outermost CALL Should Reset Redirects (-dk-)
-       next unless $operation eq 'GRID::Machine::CALL';
+       next unless ($operation eq 'GRID::Machine::CALL' || $operation eq 'GRID::Machine::EVAL');
        if ($server->{log}) {
          close STDOUT;
          $server->{log} and open(STDOUT,"> $server->{log}") or do {

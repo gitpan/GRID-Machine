@@ -23,7 +23,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.082";
+our $VERSION = "0.083";
 
 sub read_modules {
 
@@ -593,32 +593,12 @@ sub _get_result_or_callback {
 }
 
 # True if machine accepts automatic ssh connections 
-#sub is_operative {
-#  my $ssh = shift;
-#  my $host = shift;
-#  my $command = shift || 'perl -v';
-#  my $seconds = shift || 10;
-#
-#    my $operative;
-#
-#    my $devnull = File::Spec->devnull();
-#    local $SIG{ALRM} = sub { $operative = 0 };
-#    alarm($seconds);
-#    eval {
-#      # Warning O.S. dependent code!
-#      $operative = !system("$ssh $host $command > $devnull < $devnull");
-#    };
-#    alarm(0);
-#    return $operative;
-#}
-
-# True if machine accepts automatic ssh connections 
 # Eric version. Thanks Eric!
 sub is_operative {
   my $ssh = shift;
   my $host = shift;
   my $command = shift || 'perl -v';
-  my $seconds = shift || 10;
+  my $seconds = shift || 15;
 
     my $operative;
 
@@ -626,8 +606,19 @@ sub is_operative {
     eval {
         local $SIG{ALRM} = sub { die "Alarm exceeded $seconds seconds"; };
         alarm($seconds);
-        # Warning O.S. dependent code!
-        $operative = !system("$ssh $host $command > $devnull < $devnull");
+
+          my ( $savestdout, $savestdin);
+          open($savestdout, ">& STDOUT"); # factorize!
+          open(STDOUT,">", $devnull);
+
+          open($savestdin, "<& STDIN");
+          open(STDIN,">", $devnull);
+
+            $operative = !system("$ssh $host $command");
+
+          open(STDOUT, ">&", $savestdout);
+          open(STDIN, "<&", $savestdin);
+
         alarm(0);
     };
 
