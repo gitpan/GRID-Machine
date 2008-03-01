@@ -1,7 +1,14 @@
+* Parameters for new:
+    -- tar
+    -- untar
+    -- gzip
+    -- gunzip
+    -- etc.
+
 * Define functions "greadline" that - when executed on the remote side - reads from the local 
 side
 
-* Define GRID::Machine::LIOHandle objects as files on the local side that are accesible from the remote side.
+* DCALLefine GRID::Machine::LIOHandle objects as files on the local side that are accesible from the remote side.
   I.e. s.t. like:
 
    my $r = $m->sub { tutu => q{

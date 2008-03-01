@@ -12,6 +12,8 @@ t/05podcoverage.t
 t/06callbacks.t
 t/07anonymouscallback2.t
 t/08callbackbyname.t
+t/09errandlinenumbers.t
+t/10manyevals.t
 t/Include2.pm
 t/Include.pm
 lib/GRID/Machine.pm
@@ -127,4 +129,7 @@ examples/callbackbyname3.pl
 examples/callbackbyname.pl
 examples/anonymouscallback2.pl
 examples/callbackbyname_err1.pl
+examples/manycallsoutput.pl
+examples/manycalls.pl
+examples/manyevals.pl
 META.yml                                 Module meta-data (added by MakeMaker)
