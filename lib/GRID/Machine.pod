@@ -2171,6 +2171,67 @@ When we run the former example we get an ouput similar to this:
 See also the documentation in L<GRID::Machine::IOHandle> for more detailed 
 information.
 
+=head1 REMOTE PIPES
+
+C<GRID::Machine::IOHandle> objects can be used to pipe programs as in the following
+example:
+
+  pp2@nereida:~/LGRID_Machine/examples$ cat -n pipes1.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $machine = shift || 'remote.machine.domain';
+     6  my $m = GRID::Machine->new( host => $machine );
+     7
+     8  my $f = $m->open('uname -a |');
+     9  my $x = <$f>;
+    10  print "UNAME result: $x\n"
+
+When executed the program produces an output similar to this:
+
+  pp2@nereida:~/LGRID_Machine/examples$ pipes1.pl
+  UNAME result: Linux remote 2.6.8-2-686 #1 Tue Aug 16 13:22:48 UTC 2005 i686 GNU/Linux
+
+Pipes can be also for input as the following example shows:
+
+  pp2@nereida:~/LGRID_Machine/examples$ cat -n pipes.pl
+   1  #!/usr/local/bin/perl -w
+   2  use strict;
+   3  use GRID::Machine;
+   4
+   5  my $machine = shift || 'remote.machine';
+   6  my $m = GRID::Machine->new( host => $machine );
+   7
+   8  my $i;
+   9  my $f = $m->open('| sort -n > /tmp/sorted.txt');
+  10  for($i=10; $i>=0;$i--) {
+  11    $f->print("$i\n")
+  12  }
+  13  $f->close();
+  14
+  15  my $g = $m->open('/tmp/sorted.txt');
+  16  print while <$g>;
+
+when executed, the program produces the following output:
+
+  pp2@nereida:~/LGRID_Machine/examples$ pipes.pl
+  0
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+10
+
+
+
+
+
 =head1 CALLBACKS
 
 It may happen that the local machine has installed a useful set of modules 

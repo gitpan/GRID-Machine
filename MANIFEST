@@ -14,6 +14,8 @@ t/07anonymouscallback2.t
 t/08callbackbyname.t
 t/09errandlinenumbers.t
 t/10manyevals.t
+t/11tworemoteinputs.t
+t/12pipes.t
 t/Include2.pm
 t/Include.pm
 lib/GRID/Machine.pm
@@ -132,4 +134,6 @@ examples/callbackbyname_err1.pl
 examples/manycallsoutput.pl
 examples/manycalls.pl
 examples/manyevals.pl
+examples/pipes1.pl
+examples/pipes.pl
 META.yml                                 Module meta-data (added by MakeMaker)

@@ -42,28 +42,37 @@ doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
 	cd tt2; tpage  REMOTE.tt2 > ../lib/GRID/Machine/REMOTE.pod
 	cd tt2; tpage  Core.tt2 > ../lib/GRID/Machine/Core.pod
 	cd tt2; tpage  Result.tt2 > ../lib/GRID/Machine/Result.pod
+	cd tt2; tpage  IOHandle.tt2 > ../lib/GRID/Machine/IOHandle.pod
 
 pdf: @files
 	atopdf @files -o /tmp/gridmachine.pdf
 
-publicdist: doc dist
+publicdist: publish rmdist dist
 	chmod a+r GRID-Machine-*.tar.gz
 	cp GRID-Machine-*.tar.gz /home/pp2/public_html/perlexamples/GRID-Machine.tar.gz
+
+rmdist:
+	rm -fR GRID-Machine-*.tar.gz
 
 xdvi: doc
 	pod2latex -full -prefile preamble.tex lib/GRID/Machine.pod
 	latex Machine
 	latex Machine
 	makeindex Machine; latex Machine.tex 
+	pod2latex -full -prefile preamble.tex lib/GRID/Machine/IOHandle.pod
+	latex IOHandle
+	latex IOHandle
+	makeindex IOHandle; latex IOHandle.tex 
 
 html: doc
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/Core.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/REMOTE.pod
+	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/IOHandle.pod
 
 publish: doc html xdvi
-	cp Machine.dvi /home/pp2/public_html/GRID_Machine/
-	cp Machine.html /home/pp2/public_html/GRID_Machine/
+	cp *.html /home/pp2/public_html/GRID_Machine/
+	cp *.dvi /home/pp2/public_html/GRID_Machine/
 EOT
 }
 
