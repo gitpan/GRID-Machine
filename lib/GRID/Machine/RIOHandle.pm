@@ -82,7 +82,7 @@ sub diamond {
 
    my $f = SERVER()->{FILES}[$index];
 
-   return <$f>;
+   return scalar(<$f>);
 }
 
 __END__

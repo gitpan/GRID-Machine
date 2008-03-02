@@ -1,3 +1,5 @@
+* encapsulate the freeze-thaw mwethod with the subroutine object (for example matrix multiplication with PDL)
+* edebug. Remote debug
 * Parameters for new:
     -- tar
     -- untar
@@ -8,7 +10,7 @@
 * Define functions "greadline" that - when executed on the remote side - reads from the local 
 side
 
-* DCALLefine GRID::Machine::LIOHandle objects as files on the local side that are accesible from the remote side.
+* Define GRID::Machine::LIOHandle objects as files on the local side that are accesible from the remote side.
   I.e. s.t. like:
 
    my $r = $m->sub { tutu => q{
@@ -17,18 +19,6 @@ side
                        gprint $x;
                      }
                    }
-
-* trace : trace communications
-#  sub traceop {
-#    my $self = shift;
-#    if (@_) {
-#      my $traceop = shift;
-#      $self->eval('SERVER->traceop( shift() );', $traceop);
-#      $self->{traceop} = $traceop;
-#    }
-#    return $self->{traceop};
-#  }
-
 
 * Tests
 
