@@ -16,6 +16,6 @@ my $machine = GRID::Machine->new(
 my $dir = $machine->getcwd->result;
 print "$dir\n";
 
-$machine->module_transfer('Parse::Eyapp::');
+$machine->modput('Parse::Eyapp::');
 print $machine->eval(q{ system('ls -l') })->stdout;
 

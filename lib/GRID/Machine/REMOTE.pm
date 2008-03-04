@@ -474,6 +474,14 @@ sub OPEN {
   my ($server, $descriptor) = splice @_,0,2;
 
   my $file = IO::File->new();
+
+  # Check if is an ouput pipe, i.e. s.t. like:  my $f = $m->open('| sort -n'); 
+  # In such case, redirect STDOUT to null
+  if ($descriptor =~ m{^\s*\|(.*)}) {
+    my $command = $1;
+    my $nulldevice = File::Spec->devnull;
+    $descriptor = "| ($command) > $nulldevice";
+  }
   unless (defined($descriptor) and $file->open($descriptor)) {
      $server->send_error("Error while opening $descriptor. $@");
      return;

@@ -47,6 +47,16 @@ sub system {
   return $?
 }
 
+sub qqx {
+  my $wantarray = shift,
+  my $sep = shift;
+  my $program = shift;
+
+  local $/ = $sep;
+  return `$program` if $wantarray;
+  scalar(`$program`);
+}
+
 sub glob {
   my $spec = shift;
 

@@ -1584,6 +1584,102 @@ aliases:
 
 =head2 Function C<system>
 
+Executes C<sytem> on the remote machine. See an example:
+
+ $ cat -n transfer2.pl
+   1  #!/usr/local/bin/perl -w
+   2  use strict;
+   3  use GRID::Machine qw(is_operative);
+   4  use Data::Dumper;
+   5
+   6  my $host = shift || 'casiano@remote.machine.es';
+   7
+   8  my $machine = GRID::Machine->new(
+   9        host => $host,
+  10        cleanup => 1,
+  11        sendstdout => 1,
+  12        startdir => 'perl5lib',
+  13        prefix => '/home/casiano/perl5lib/',
+  14     );
+  15
+  16  my $dir = $machine->getcwd->result;
+  17  print "$dir\n";
+  18
+  19  $machine->modput('Parse::Eyapp::');
+  20  print $machine->system('tree');
+
+When executed produces an output like:
+
+  $ transfer2.pl
+  /home/casiano/perl5lib
+  .
+  `-- Parse
+      |-- Eyapp
+      |   |-- Base.pm
+      |   |-- Driver.pm
+      |   |-- Grammar.pm
+      |   |-- Lalr.pm
+      |   |-- Node.pm
+      |   |-- Options.pm
+      |   |-- Output.pm
+      |   |-- Parse.pm
+      |   |-- Scope.pm
+      |   |-- Treeregexp.pm
+      |   |-- YATW.pm
+      |   `-- _TreeregexpSupport.pm
+      `-- Eyapp.pm
+
+  2 directories, 13 files
+
+=head2 Function C<qx>
+
+Similar to backtick quotes. The result depends on the context.
+In a list context returns a list with the lines of the output.
+In a scalar context reurns a string with the output. The value of
+C<$"> on the local machine decides the register separator used.
+See an example:
+
+  $ cat -n transfer3.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine qw(is_operative);
+     4  use Data::Dumper;
+     5
+     6  my $host = shift || 'casiano@remote.machine.es';
+     7
+     8  my $machine = GRID::Machine->new( host => $host );
+     9  my $DOC = << "DOC";
+    10  one. two. three.
+    11  four. five. six.
+    12  seven.
+    13  DOC
+    14
+    15  # List context: returns  a list with the lines
+    16  {
+    17    local $/ = '.';
+    18    my @a = $machine->qx("echo '$DOC'");
+    19    local $"= ",";
+    20    print "@a";
+    21  }
+    22
+    23  # scalar context: returns a string with the output
+    24  my $a = $machine->qx("echo '$DOC'");
+    25  print $a;
+
+
+When executed produces the following output:
+
+  $ transfer3.pl
+  one., two., three.,
+  four., five., six.,
+  seven.,
+
+  one. two. three.
+  four. five. six.
+  seven.
+
+
+
 =head2 Function C<glob>
 
 =head2 Function C<tar>
@@ -1672,7 +1768,7 @@ See an example:
      2  use strict;
      3  use GRID::Machine;
      4
-     5  my $host = 'orion.pcg.ull.es';
+     5  my $host = 'remote.machine.es';
      6  my $dir = shift || "somedir";
      7  my $file = shift || $0; # By default copy this program
      8
@@ -2228,6 +2324,14 @@ when executed, the program produces the following output:
   9
 10
 
+When opening a pipe for output like in line 9 in the 
+former example 
+
+  my $f = $m->open('| sort -n > /tmp/sorted.txt')
+
+be sure to redirect the C<STDOUT> of the program. 
+Otherwise, C<GRID::Machine> will redirect it to the
+C<null> device and the output will be lost.
 
 
 
@@ -2706,7 +2810,7 @@ Casiano Rodriguez Leon E<lt>casiano@ull.esE<gt>
 =head1 ACKNOWLEDGMENTS
 
 This work has been supported by CEE (FEDER) and the Spanish Ministry of
-I<Educación y Ciencia> through I<Plan Nacional I+D+I> number TIN2005-08818-C04-04
+I<Educacion y Ciencia> through I<Plan Nacional I+D+I> number TIN2005-08818-C04-04
 (ULL::OPLINK project L<http://www.oplink.ull.es/>). 
 Support from Gobierno de Canarias was through GC02210601
 (I<Grupos Consolidados>).

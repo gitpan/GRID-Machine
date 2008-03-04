@@ -1,3 +1,14 @@
+* Rewrite qx
+* May be an AUTOLOAD for Perl CORE functions?
+    - I can check if the opertor exists using Module::CoreList on the full name
+    of the function
+    - prototype("CORE::length")
+
+* Add to "sub include" the parsing of attributes as:
+    - "context" (send the context scalar/list to the remote sub
+    - "filter" Filter output
+    - 
+
 * encapsulate the freeze-thaw mwethod with the subroutine object (for example matrix multiplication with PDL)
 * edebug. Remote debug
 * Parameters for new:

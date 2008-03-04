@@ -16,6 +16,7 @@ t/09errandlinenumbers.t
 t/10manyevals.t
 t/11tworemoteinputs.t
 t/12pipes.t
+t/13pipes.t
 t/Include2.pm
 t/Include.pm
 lib/GRID/Machine.pm
@@ -137,4 +138,5 @@ examples/manycalls.pl
 examples/manyevals.pl
 examples/pipes1.pl
 examples/pipes.pl
+examples/pipes2.pl
 META.yml                                 Module meta-data (added by MakeMaker)

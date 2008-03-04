@@ -50,9 +50,12 @@ pdf: @files
 publicdist: publish rmdist dist
 	chmod a+r GRID-Machine-*.tar.gz
 	cp GRID-Machine-*.tar.gz /home/pp2/public_html/perlexamples/GRID-Machine.tar.gz
+	cp GRID-Machine-*.tar.gz /tmp/
+	chmod a+r /tmp/GRID-Machine-*.tar.gz
 
 rmdist:
 	rm -fR GRID-Machine-*.tar.gz
+	rm -fR /tmp/GRID-Machine-*.tar.gz
 
 xdvi: doc
 	pod2latex -full -prefile preamble.tex lib/GRID/Machine.pod
