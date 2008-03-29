@@ -23,7 +23,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.088";
+our $VERSION = "0.089";
 
 sub read_modules {
 
@@ -111,6 +111,7 @@ sub read_modules {
 package GRID::Machine;
 use strict;
 use warnings;
+
 $USES;
 
 $REMOTE_LIBRARY
@@ -138,7 +139,7 @@ EOREMOTE
      my %opts = @_;
 
      my $a = "";
-     die "Illegal arg  $a\n" if $a = first { !exists $legal{$_} } keys(%opts);
+     die __PACKAGE__."::new: Illegal arg <$a>\n" if $a = first { !exists $legal{$_} } keys(%opts);
 
 
      my $sendstdout = 1;
@@ -180,7 +181,7 @@ EOREMOTE
         my @command;
         if( exists $opts{command} ) {
            my $c = $opts{command};
-           @command = ref($c) && $c->isa("ARRAY") ? @$c : ( "$c" );
+           @command = ref($c) && UNIVERSAL::isa($c, "ARRAY") ? @$c : ( "$c" );
         }
         else {
            $host = $opts{host} or

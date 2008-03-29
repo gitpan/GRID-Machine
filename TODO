@@ -9,7 +9,7 @@
     - "filter" Filter output
     - 
 
-* encapsulate the freeze-thaw mwethod with the subroutine object (for example matrix multiplication with PDL)
+* encapsulate the freeze-thaw method with the subroutine object (for example matrix multiplication with PDL)
 * edebug. Remote debug
 * Parameters for new:
     -- tar

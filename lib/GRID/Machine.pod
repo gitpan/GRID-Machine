@@ -472,6 +472,63 @@ available on the remote side. For instance:
 See the section 
 L<Opaque Structures> for a full example
 
+=item * command
+
+This argument is an alternative to the C<host> argument. Use one or the other. It allows 
+a more specific control of the command executed.
+
+It can be a reference to a list or a string. It fully specifies the C<command> to execute. 
+The following example initiates a SSH connection with the remote machine
+with X11 forwarding
+
+ $ cat -n pp2_testptkdb.pl
+   1  #!/usr/local/bin/perl -w
+   2  # Execute this program being the user
+   3  # that initiated the X11 session
+   4  use strict;
+   5  use GRID::Machine;
+   6
+   7  my $host = 'casiano@beowulf.pcg.ull.es';
+   8
+   9  my $machine = GRID::Machine->new(
+  10     command => ['ssh', '-X', $host, 'perl'],
+  11  );
+  12
+  13  print $machine->eval(q{
+  14    print "$ENV{DISPLAY}\n";
+  15    system('xclock ');
+  16  });
+
+It will produce an output like:
+
+  $ pp2_testptkdb.pl
+  localhost:11.0
+
+and I<a graphic clock will pop-up on your window>.
+
+The argument associated with C<command> can be a string. The previous example
+can be rewritten as:
+
+
+  pp2@nereida:~/LGRID_Machine/examples$ cat -n testptkdb_2.pl
+     1  #!/usr/local/bin/perl -w
+     2  # Execute this program being the user
+     3  # that initiated the X11 session
+     4  use strict;
+     5  use GRID::Machine;
+     6
+     7  my $host = 'casiano@beowulf.pcg.ull.es';
+     8
+     9  my $machine = GRID::Machine->new(
+    10     command => "ssh -X $host perl",
+    11  );
+    12
+    13  print $machine->eval(q{
+    14    print "$ENV{DISPLAY}\n";
+    15    system('xclock ');
+    16  });
+
+
 =back
 
 =head2 The C<eval> Method
@@ -2638,28 +2695,6 @@ Here are the contents:
 I will be surprised if this module works on anything that is not
 UNIX.
 
-
-=head2 X Forwarding
-
-X forwarding via C<ssh -X > does not work. C<GRID::Machine> uses C<open2> (see L<IPC::Open2>)
-to set the connection and shares its limitations. The following program produces an error:
-
-    use GRID::Machine qw(is_operative);
-    use Data::Dumper;
-
-    my $host = 'user@remote.machine.domain';
-
-    my $machine = GRID::Machine->new(host => $host, ssh => 'ssh -X');
-
-    print $machine->eval(q{ system('xclock &') });
-
-When we execute it we get this message:
-
-  $ xclock.pl
-  Warning: No xauth data; using fake authentication data for X11 forwarding.
-  Can't exec "ssh -X": File or dir does not exists at /usr/share/perl/5.8/IPC/Open3.pm line 168.
-  open2: exec of ssh -X user@remote.machine.domain perl failed at \
-             /home/pp2/LGRID_Machine/lib/GRID/Machine.pm line 168
 
 =head2 Opaque Structures
 
