@@ -1,3 +1,20 @@
+* Write a debugger
+
+* evalfile: read file and eval
+
+* if exists a file .grid_machine/machine the options will be read from that file?
+
+* RIO: remote files are now an integer. It does not work with IO::select.
+  It is more transparent if it is a file on the local side. 
+  Whatever is read on the remote side
+  is written on the local fileand then read it again?
+
+* Be sure to kill nc in the remote machine when hangs
+* Write a loader or booter. 
+  Check if the modules were already written on the remote side and the versions agree.
+  In such case, don't load them again.
+* auxiliary functions (split host, port, etc.)
+
 * Rewrite qx
 * May be an AUTOLOAD for Perl CORE functions?
     - I can check if the opertor exists using Module::CoreList on the full name
@@ -8,6 +25,7 @@
     - "context" (send the context scalar/list to the remote sub
     - "filter" Filter output
     - 
+* log files (stdout, stderr) in a subdir?
 
 * encapsulate the freeze-thaw method with the subroutine object (for example matrix multiplication with PDL)
 * edebug. Remote debug

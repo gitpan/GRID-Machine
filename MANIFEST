@@ -19,6 +19,7 @@ t/12pipes.t
 t/13pipes.t
 t/Include2.pm
 t/Include.pm
+scripts/remotetest.pl
 lib/GRID/Machine.pm
 lib/GRID/Machine.pod
 lib/GRID/Machine/Core.pm

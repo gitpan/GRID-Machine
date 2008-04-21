@@ -1,25 +1,6 @@
 use strict;
 use warnings;
 
-# Warning! There are some Perl functions that have some strange behavior:
-# Example: mkdir fails when called via an array
-#   DB<28> x @a
-#   0  '/tmp/DIRECT'
-#   1  18
-#   DB<29> x mkdir(@a)
-#   0  0
-#  DB<31> !!ls -ltr /tmp/DIRECT
-#  ls: /tmp/DIRECT: No existe el fichero o el directorio
-#  (Command exited 1)
-#     
-# However a direct call succeeds:
-#
-#    DB<32> x mkdir('/tmp/DIRECT', 18)
-#  0  1
-#    DB<34> !!ls -ltrd /tmp/DIRECT
-#  d---------  2 pp2 pp2 4096 2007-06-18 12:16 /tmp/DIRECT
-# This does not seem to be my fault or GRID::Machine fault :-)
-
 sub getcwd { return getcwd() }
 
 sub chdir  { 
@@ -55,6 +36,20 @@ sub qqx {
   local $/ = $sep;
   return `$program` if $wantarray;
   scalar(`$program`);
+}
+
+sub _fork {
+  my $childcode = shift;
+
+  my $pid = fork;
+  die "Can't fork\n" unless defined($pid);
+  return $pid if ($pid);
+
+  # child
+
+  my $subref = eval "use strict; sub { $childcode }";
+  $subref->(@_);
+  exit(0);
 }
 
 sub glob {

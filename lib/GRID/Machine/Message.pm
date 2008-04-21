@@ -14,6 +14,7 @@ sub read_operation {
 
    $readfunc->( my $operation, undef );
    defined $operation or die "Expected operation\n";
+   
    chomp $operation;
 
    $readfunc->( my $numargs, undef );
@@ -23,7 +24,7 @@ sub read_operation {
    my @args;
    while( $numargs ) {
       $readfunc->( my $arglen, undef );
-      defined $arglen or die "Expected length of argument\n";
+      die "Expected length of argument\n" unless (defined($arglen) && $arglen =~ /^\d+/);
       chomp $arglen;
 
       my $arg = "";

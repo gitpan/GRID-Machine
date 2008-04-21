@@ -194,7 +194,7 @@ When the program is executed we get the following output:
                           $ extendprotocol.pl
                           Error: Provide a name to greet!
 
-=head1 INMEDIATE PRINTING: REMOTE DEBUGGING 
+=head1 INMEDIATE PRINTING
 
 =head2 Functions C<gprint> and C<gprintf>
 
@@ -262,6 +262,55 @@ Observe how the message C<'Inside rmap!'> generated at line 15 using C<print> is
 (actually is sent to C<STDOUT> in line 38).
 The messages generated using C<gprint> and C<gprintf> (lines 20, 26 and 29)
 were inmediately sent to C<STDOUT>.
+
+=head1 REMOTE DEBUGGING 
+
+To run the remote side under the control of the perl debugger use the C<debug>
+option of C<new>. The associated value must be a port number higher than 1024:
+
+     my $machine = GRID::Machine->new(
+        host => $host,
+        debug => $port,
+        includes => [ qw{SomeFunc} ],
+     );
+
+Before running the example open a SSH session to the remote machine
+in a different terminal and execute C<netcat> to listen (option C<-l>)
+in the chosen port:
+
+  pp2@nereida:~/LGRID_Machine$ ssh beowulf 'netcat -v -l -p 12345'
+  listening on [any] 12345 ...
+                              
+Now run the program in the first terminal:
+
+  pp2@nereida:~/LGRID_Machine/examples$ debug1.pl beowulf:12345
+  Debugging with 'ssh beowulf PERLDB_OPTS="RemotePort=beowulf:12345" perl -d'
+  Remember to run 'netcat -v -l -p 12345' in beowulf
+
+The program looks blocked. If you go to the other terminal you will find
+the familiar perl debugger prompt:
+
+  casiano@beowulf:~$ netcat -v -l -p 12345
+  listening on [any] 12345 ...
+  connect to [193.145.102.240] from beowulf.pcg.ull.es [193.145.102.240] 38979
+
+  Loading DB routines from perl5db.pl version 1.28
+  Editor support available.
+
+  Enter h or `h h' for help, or `man perldebug' for more help.
+
+  GRID::Machine::MakeAccessors::(/home/pp2/LGRID_Machine/lib/GRID/Machine/MakeAccessors.pm:33):
+  33:     1;
+  auto(-1)  DB<1> c GRID::Machine::main
+  GRID::Machine::main(/home/pp2/LGRID_Machine/lib/GRID/Machine/REMOTE.pm:490):
+  490:      my $server = shift;
+    DB<2>                        
+
+From now on you can execute almost any debugger command. Unfortunately
+you are now inside C<GRID::Machine> code and - until you gain some familiarity 
+with C<GRID::Machine> code -
+it is a bit difficult to find where your code is and where to put 
+your breakpoints.  Future work: write a proper debugger front end.
 
 
 

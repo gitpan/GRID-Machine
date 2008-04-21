@@ -428,8 +428,6 @@ By default the home directory. For example:
 
 If it does not exist is created.
 
-See the section L<EXAMPLE: RUNNING DISTRIBUTION TESTS ON REMOTE MACHINES> for a full example.
-
 =item * startenv
 
 A reference to a hash. It will be used to modify the remote
@@ -472,6 +470,52 @@ available on the remote side. For instance:
 See the section 
 L<Opaque Structures> for a full example
 
+=item * includes
+
+A reference to an ARRAY of strings. Determines the "remote modules"
+that will be included when the remote Perl interpreter is started.
+The enumerated modules must be available on the local side. For instance,
+the following program loads the "Module":
+
+  pp2@nereida:~/LGRID_Machine/examples$ cat -n includes.pl
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $host = shift || die "Usage:\n$0 machine\n";
+     6
+     7  my $machine = GRID::Machine->new(
+     8     host => $host,
+     9     includes => [ qw{SomeFunc} ],
+    10  );
+    11
+    12  my $r = $machine->max(7, 9, 2, 8);
+    13
+    14  print $r;
+    15  print "Max of (7, 9, 2, 8) is: ".$r->result."\n";
+
+
+A "remote module" resembles a module but contains only subroutines 
+and C<uses>. The functions are directly placed in the space name of the 
+C<GRID::Machine> object (just like the method C<sub> does. 
+See section L<The sub Method>).
+Here are the contents of the "remote module" C<SomeFunc.pm>:
+
+  pp2@nereida:~/LGRID_Machine/examples$ cat -n SomeFunc.pm
+     1  use List::Util qw{max};
+     2  use Sys::Hostname;
+     3
+     4  sub max {
+     5    print "machine: ".hostname().": Inside sub two(@_)\n";
+     6    List::Util::max(@_)
+     7  }
+
+when executed, the program produces the following output:
+
+  pp2@nereida:~/LGRID_Machine/examples$ includes.pl beowulf
+  machine: beowulf: Inside sub two(7 9 2 8)
+  Max of (7, 9, 2, 8) is: 9
+
 =item * command
 
 This argument is an alternative to the C<host> argument. Use one or the other. It allows 
@@ -504,7 +548,7 @@ It will produce an output like:
   $ pp2_testptkdb.pl
   localhost:11.0
 
-and I<a graphic clock will pop-up on your window>.
+and I<a graphics clock will pop-up on your window>.
 
 The argument associated with C<command> can be a string. The previous example
 can be rewritten as:
@@ -528,6 +572,47 @@ can be rewritten as:
     15    system('xclock ');
     16  });
 
+Another example of use of the C<command> option is to put the remote
+side on I<debugging> mode:
+
+  pp2@nereida:~/LGRID_Machine/examples$ cat netcat3.pl
+  #!/usr/local/bin/perl -w
+  use strict;
+  use GRID::Machine;
+
+  my $port = shift || 12345;
+
+  my $debug = qq{PERLDB_OPTS="RemotePort=beowulf:$port"};
+
+  my $machine = GRID::Machine->new(
+     command => qq{ssh beowulf '$debug perl -d'},
+  );
+
+  print $machine->eval(q{
+    system('ls');
+    print %ENV,"\n";
+  });
+
+Start by running netcat on the remote side:
+
+  pp2@nereida:~/LGRID_Machine/examples$ ssh beowulf nc  -v -l beowulf -p 12345
+
+and now run the program:
+
+  pp2@nereida:~/LGRID_Machine/examples$ netcat3.pl
+
+The prompt of the debugger will appear in the netcat terminal
+
+=item * debug
+
+The value must be a port number higher than 1024. Used to run the remote
+side under the control of the debugger. See the section L<REMOTE DEBUGGING>
+
+     my $machine = GRID::Machine->new(
+        host => $host,
+        debug => $port,
+        includes => [ qw{SomeFunc} ],
+     );
 
 =back
 
@@ -2046,7 +2131,7 @@ When the program is executed we get the following output:
                           $ extendprotocol.pl
                           Error: Provide a name to greet!
 
-=head1 INMEDIATE PRINTING: REMOTE DEBUGGING 
+=head1 INMEDIATE PRINTING
 
 =head2 Functions C<gprint> and C<gprintf>
 
@@ -2114,6 +2199,55 @@ Observe how the message C<'Inside rmap!'> generated at line 15 using C<print> is
 (actually is sent to C<STDOUT> in line 38).
 The messages generated using C<gprint> and C<gprintf> (lines 20, 26 and 29)
 were inmediately sent to C<STDOUT>.
+
+=head1 REMOTE DEBUGGING 
+
+To run the remote side under the control of the perl debugger use the C<debug>
+option of C<new>. The associated value must be a port number higher than 1024:
+
+     my $machine = GRID::Machine->new(
+        host => $host,
+        debug => $port,
+        includes => [ qw{SomeFunc} ],
+     );
+
+Before running the example open a SSH session to the remote machine
+in a different terminal and execute C<netcat> to listen (option C<-l>)
+in the chosen port:
+
+  pp2@nereida:~/LGRID_Machine$ ssh beowulf 'netcat -v -l -p 12345'
+  listening on [any] 12345 ...
+                              
+Now run the program in the first terminal:
+
+  pp2@nereida:~/LGRID_Machine/examples$ debug1.pl beowulf:12345
+  Debugging with 'ssh beowulf PERLDB_OPTS="RemotePort=beowulf:12345" perl -d'
+  Remember to run 'netcat -v -l -p 12345' in beowulf
+
+The program looks blocked. If you go to the other terminal you will find
+the familiar perl debugger prompt:
+
+  casiano@beowulf:~$ netcat -v -l -p 12345
+  listening on [any] 12345 ...
+  connect to [193.145.102.240] from beowulf.pcg.ull.es [193.145.102.240] 38979
+
+  Loading DB routines from perl5db.pl version 1.28
+  Editor support available.
+
+  Enter h or `h h' for help, or `man perldebug' for more help.
+
+  GRID::Machine::MakeAccessors::(/home/pp2/LGRID_Machine/lib/GRID/Machine/MakeAccessors.pm:33):
+  33:     1;
+  auto(-1)  DB<1> c GRID::Machine::main
+  GRID::Machine::main(/home/pp2/LGRID_Machine/lib/GRID/Machine/REMOTE.pm:490):
+  490:      my $server = shift;
+    DB<2>                        
+
+From now on you can execute almost any debugger command. Unfortunately
+you are now inside C<GRID::Machine> code and - until you gain some familiarity 
+with C<GRID::Machine> code -
+it is a bit difficult to find where your code is and where to put 
+your breakpoints.  Future work: write a proper debugger front end.
 
 
 
@@ -2639,55 +2773,6 @@ machine):
                       fact(6) is 720
 
 
-=head1 EXAMPLE: RUNNING DISTRIBUTION TESTS ON REMOTE MACHINES
-
-The following script C<examples/remotetest.pl> loads a CPAN distribution
-on a set of remote machines and run the tests on each of them:
-
-      $ examples/remotetest.pl GRID-Machine-0.07.tar.gz orion
-      ************orion************
-      Writing Makefile for GRID::Machine
-      Warning: prerequisite Module::Which 0.0205 not found.
-
-Here are the contents:
-
-  $ cat -n examples/remotetest.pl
-     1  #!/usr/local/bin/perl -w
-     2  use strict;
-     3  use GRID::Machine;
-     4
-     5  my $dist = shift or die "Usage:\n$0 distribution.tar.gz machine1 machine2 ... \n";
-     6
-     7  die "No distribution $dist found\n" unless -r $dist;
-     8
-     9    die "Distribution does not follow standard name convention\n"
-    10  unless $dist =~ m{([\w.-]+)\.tar\.gz$};
-    11  my $dir = $1;
-    12
-    13  die "Usage:\n$0 distribution.tar.gz machine1 machine2 ... \n" unless @ARGV;
-    14  for my $host (@ARGV) {
-    15    my $m = GRID::Machine->new(host => $host, startdir => '/tmp');
-    16
-    17    $m->put([$dist]);
-    18
-    19    $m->tar($dist, '-xz')->ok or do {
-    20      warn "$host: Can't extract files from $dist\n";
-    21      next;
-    22    };
-    23
-    24    $m->chdir($dir)->ok or do {
-    25      warn "$host: Can't change to directory $dir\n";
-    26      next;
-    27    };
-    28
-    29    print "************$host************\n";
-    30    next unless $m->run('perl Makefile.PL');
-    31    next unless $m->run('make');
-    32    next unless $m->run('make test');
-    33  }
-
-
-
 =head1 LIMITATIONS
 
 =head2 Operating System
@@ -2749,7 +2834,9 @@ When executed this program produces the following output:
              [15 22]
             ]
 
-=head3 Wish List
+=begin COMMENT
+
+  =head3 Wish List
 
 It will benefit this module to have a more OOP oriented C<dumper>
 so that if the objet being dumped is I<opaque> but has a C<Dumper> 
@@ -2757,6 +2844,8 @@ method, such method will be called. The idea being that anyone
 developing some sort of external object (C, XS, etc.) will collaboratively
 define a C<Dumper> method specifying how the object will be dumped.
 That is a goal to fulfill.
+
+=end COMMENT
   
 =head2 Call by Reference
 
@@ -2784,8 +2873,26 @@ by a remote subroutine is I<by result>, like is done for C<$y> in the previous e
 
 =head2 Limitations of the C<include> Method
 
-The C<include> parses Perl code.  It is a one page length parser (72 lines at the moment
-of writing). It obviously can't parse everything. But works for most of the code.
+"Remote Modules" is the term used for files containing Perl code that will be loaded
+onto the remote Perl server via the C<incldue> method or through the C<includes> 
+argument of C<new>. These files can only contain 
+
+=over 2
+
+=item * Subroutines
+
+=item * C<use Module> declarations. The C<Module> must exists in the remote
+server
+
+=item * POD documentation
+
+Variable declarations and variable initializations are ignored.
+
+=back
+
+The C<include> method parses Perl code. It is a heuristic one page length parser (72 lines at the moment
+of writing). It obviously can't parse everything. But works for most of the code restricted
+to the aforementioned limitations.
 
 =head1 EXPORTS
 

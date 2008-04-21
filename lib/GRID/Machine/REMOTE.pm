@@ -1,7 +1,6 @@
 package GRID::Machine;
 use strict;
 use Data::Dumper;
-#use POSIX;
 use List::Util qw(first);
 use Scalar::Util qw(blessed);
 use Cwd;
@@ -38,6 +37,7 @@ sub send_result {
     cleanup 
     clientpid
     command
+    debug
     Deparse
     err 
     errfile 
@@ -66,6 +66,24 @@ sub send_result {
     return $SERVER;
   }
 
+  sub setloganderr {
+    my ($log, $args, $file) = @_;
+
+    $args->{$log} = "rperl$args->{clientpid}_$$.$log" unless $args->{$log};
+    my $logname = "$ENV{HOME}/$args->{$log}";
+    my $logfile = IO::File->new("> $logname");
+    unless ($logfile) {
+        $SERVER->send_error("Can't open $logname for writing. $@");
+        return $SERVER
+    }
+    
+    $logfile->autoflush(1);
+
+    $SERVER->{$log} = $logname;
+    $SERVER->{$log."file"} = $logfile;
+
+  }
+
   sub new {
     my $class = shift;
     my %args = @_;
@@ -84,16 +102,23 @@ sub send_result {
     my $cleanup = $args{cleanup};
     $cleanup = 1 unless defined($cleanup);
 
-    #my ($sysname, $nodename, $release, $version, $machine) = POSIX::uname();
-    my $host = $args{host}; # ||  $nodename;
+    my $host = $args{host} || $ENV{HOSTNAME}; 
+    unless ($host) {
+      eval q{
+        require Sys::Hostname;
+      };
+      $host = $@? 'unknown' : Sys::Hostname::hostname();
+    }
 
     my $startdir = $args{startdir};
     if ($startdir) {
       mkdir $startdir unless -x $startdir;
-      chdir($startdir); # or create or die ...
+      chdir($startdir) or die "$host: can't change to dir $startdir\n"; 
     }
 
     # Set initial environment variables
+    # No need to check is a HASH ref since it was already checked in the local side
+    # (See GRID/Machine.pm)
     my %startenv = %{$args{startenv}};
     for (keys %startenv) {
       $ENV{$_} = $startenv{$_};
@@ -111,9 +136,15 @@ sub send_result {
 
     my $clientpid = $args{clientpid} || $$;
 
+    my $prefix = $args{prefix} || "$ENV{HOME}/perl5lib";
+    unless (-r $prefix) { 
+      mkdir $prefix unless -r $prefix; 
+      die "$host: can't create directory $prefix\n" unless (-d $prefix) && (-r $prefix);
+    }
+    push @INC, $prefix;
+
     # create copy of STDOUT to use as command output (-dk-)
-    open(my $CMDOUT, ">&STDOUT") or die;
-    $CMDOUT->autoflush(1);
+    open(my $CMDIN, "<&STDIN") or die "$host: Can't create copy of STDIN\n";
 
     my $readfunc = sub {
        if( defined $_[1] ) {
@@ -121,25 +152,22 @@ sub send_result {
        }
        else {
           $_[0] = <STDIN>;
+          die "Premature EOF received" unless defined($_[0]);
           length $_[0];
        }
     };
 
+    # create copy of STDOUT to use as command output (-dk-)
+    open(my $CMDOUT, ">&STDOUT") or die "$host: Can't create copy of STDOUT\n";
+    $CMDOUT->autoflush(1);
+
     my $writefunc = sub {
-       print $CMDOUT $_[0];
+       syswrite $CMDOUT, $_[0];
     };
 
-    my $prefix = $args{prefix} || "$ENV{HOME}/perl5lib";
-    mkdir $prefix unless -r $prefix; 
-    push @INC, $prefix;
-
-    # die if $!
+    my $debug = $args{debug} || 0;
 
     my $handler = {
-
-      #Indent  => 2,
-      #Deparse => 1,
-
       sendstdout => $sendstdout,
       readfunc => $readfunc,
       writefunc => $writefunc,
@@ -147,9 +175,13 @@ sub send_result {
       cleanup  => $cleanup,
       prefix   => $prefix,
       clientpid => $clientpid, 
+
+      # Used to store remote files (see GRID::Machine::RIOHandle)
       FILES     => [],
 
+      # Used to store remote subroutines. A remote sub is a GRID::Machine::RemoteSub object
       stored_procedures => {},
+      debug => $debug,
     };
 
     $SERVER = bless $handler, $class;
@@ -157,40 +189,20 @@ sub send_result {
     # Create it if it does not exist? (the directories I mean)
     # What if it is absolute?
 
-    $args{log} = "rperl$clientpid.log" unless $args{log};
-    my $log = "$ENV{HOME}/$args{log}";
-    open my $logfile, "> $log" or do {
-        $SERVER->send_error("Can't open $log for writing. $@");
-        return $SERVER
-    };
-    $SERVER->{log} = $log;
-    $SERVER->{logfile} = $logfile;
-
+    setloganderr('log', \%args, 'stdout');
     # redirect STDOUT - once per remote session! (-dk-)
     open(STDOUT,"> $SERVER->{log}") or do {
-        $SERVER->send_error("Can't redirect stdout. $@");
+        $SERVER->send_error("Can't redirect STDOUT. $@");
         return $SERVER
     };
 
-    $args{err} = "rperl$clientpid.err" unless $args{err};
-    my $err = "$ENV{HOME}/$args{err}";
-    open my $errfile, "> $err" or do {
-        $SERVER->send_error("Can't open $err for writing. $@");
-        return $SERVER
-    };
-    $SERVER->{err} = $err;
-    $SERVER->{errfile} = $errfile;
-
-    # redirect STDERR - once per remote session! (-dk-)
-    open(STDERR,"> $SERVER->{err}") or do {
-        $SERVER->send_error("Can't redirect stderr. $@");
-        return $SERVER
-    };
+    setloganderr('err', \%args, 'stderr');
 
     return $SERVER;
   }
 } # end closure
 
+# Methods in uppercase are PROTOCOL methods
 sub QUIT {  
     my $server = shift;
 
@@ -232,7 +244,10 @@ sub eval_and_read_stdfiles {
     # handling 'GRID::Machine::QUIT' when waiting for 'RESULT' from callback (-dk-)
     if ($err =~ /^EXIT/) { undef $@; exit 0 }
 
-    return GRID::Machine::Result->new(errmsg => "Can't recover stdout and stderr")
+    return GRID::Machine::Result->new(
+      errmsg => "Can't recover stdout and stderr",
+      results => \@results,
+    )
   unless @output;
 
   my ($rstdout, $rstderr) = @output;
@@ -244,30 +259,6 @@ sub eval_and_read_stdfiles {
     results => \@results
   );
 }
-
-#sub EVAL {
-#  my ($server, $code, $args) = @_;
-#  
-#  my $subref = eval "use strict; sub { $code }";
-#
-#  if( $@ ) {           # Error while compiling code
-#     $server->send_error("Error while compiling eval. $@");
-#     return;
-#  }
-#
-#  my $results = $server->eval_and_read_stdfiles($subref, @$args) ;
-#
-#  if( $@ ) {
-#     $code =~ m{(.*)};
-#     $server->send_error( 
-#       "Error running eval code $1. $@"
-#     );
-#     return;
-#  }
-#
-#  $server->send_operation( "RETURNED", $results );
-#  return;
-#}
 
 sub EVAL {
   my ($server, $code, $args) = @_;
@@ -543,6 +534,17 @@ sub main() {
   } # package
 }
 
+# GRID::Machine::DEBUG_LOAD_FINISHED 
+# signals that the initial bootstraping has finished
+sub DEBUG_LOAD_FINISHED {
+  my $self = shift;
+
+  $DB::single = 1 if $self->{debug};
+}
+
+
+1;
+
 package GRID::Machine::RemoteSub;
 
 {
@@ -559,3 +561,4 @@ package GRID::Machine::RemoteSub;
 }
 
 1;
+

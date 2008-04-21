@@ -5,7 +5,7 @@ WriteMakefile(
     NAME              => 'GRID::Machine',
     VERSION_FROM      => 'lib/GRID/Machine.pm', # finds $VERSION
     PREREQ_PM         => {Module::Which => '0.0205', }, 
-#    'EXE_FILES'       => [ 'scripts/remotetest.pl' ],
+    'EXE_FILES'       => [ 'scripts/remotetest.pl' ],
     ($] >= 5.007 ?     ## Add these new keywords supported since 5.005
       (
          ABSTRACT_FROM  => 'lib/GRID/Machine.pod', # retrieve abstract from module
@@ -19,12 +19,12 @@ sub MY::postamble {
 my @files = (
   'TODO',
   'lib/GRID/Machine.pm',
-#  'lib/GRID/Machine/Core.pm',
+  'lib/GRID/Machine/Core.pm',
 #  'lib/GRID/Machine/MakeAccessors.pm',
-#  'lib/GRID/Machine/Message.pm',
+  'lib/GRID/Machine/Message.pm',
   'lib/GRID/Machine/REMOTE.pm',
 #  'lib/GRID/Machine/Request.pm',
-#  'lib/GRID/Machine/Result.pm',
+  'lib/GRID/Machine/Result.pm',
    'lib/GRID/Machine/IOHandle.pm',
    'lib/GRID/Machine/RIOHandle.pm',
 #  'examples/MyLocal.pm',

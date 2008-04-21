@@ -23,7 +23,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.089";
+our $VERSION = "0.090";
 
 sub read_modules {
 
@@ -38,7 +38,7 @@ sub read_modules {
         die "Can't find module $module\n";
       }
 
-      $m .= "#line 1 $path\n";
+      $m .= "#line 1 \"$path\"\n";
       local $/ = undef;
       open my $FILE, "< $path";
         $m .= <$FILE>;
@@ -56,6 +56,7 @@ sub read_modules {
   my @legal = qw(
     cleanup 
     command
+    debug
     err 
     host 
     includes
@@ -103,6 +104,7 @@ sub read_modules {
         $sendstdout, 
         $cleanup, 
         $prefix,
+        $portdebug,
        ) 
     = @_;
 
@@ -112,7 +114,7 @@ package GRID::Machine;
 use strict;
 use warnings;
 
-$USES;
+$USES
 
 $REMOTE_LIBRARY
 
@@ -128,6 +130,7 @@ my \$rperl = $class->new(
   sendstdout => $sendstdout,
   cleanup => $cleanup,
   prefix  => '$prefix', # Where to install modules
+  debug => $portdebug,
 );
 \$rperl->main();
 __END__
@@ -142,6 +145,7 @@ EOREMOTE
      die __PACKAGE__."::new: Illegal arg <$a>\n" if $a = first { !exists $legal{$_} } keys(%opts);
 
 
+     my $portdebug = $opts{debug} || 0;
      my $sendstdout = 1;
      $sendstdout = $opts{sendstdout} if exists($opts{sendstdout});
      ###########################################################################
@@ -181,6 +185,7 @@ EOREMOTE
         my @command;
         if( exists $opts{command} ) {
            my $c = $opts{command};
+           $host = $ENV{HOSTNAME} || "REMOTE";
            @command = ref($c) && UNIVERSAL::isa($c, "ARRAY") ? @$c : ( "$c" );
         }
         else {
@@ -190,7 +195,15 @@ EOREMOTE
              die "Can't execute perl in $host using ssh connection with automatic authentication\n"
            unless is_operative($ssh, $host, "perl -v", $wait);
 
-           @command = ( $ssh, $host, $opts{perl} || "perl" );
+           if ($portdebug && $portdebug =~ /^\d+$/) {
+             my $perl = qq{PERLDB_OPTS="RemotePort=$host:$portdebug" }.($opts{perl} || 'perl -d');
+             @command = ( "$ssh $host $perl" );
+             print "Debugging with '@command'\n".
+                   "Remember to run 'netcat -v -l -p $portdebug' in $host\n\n";
+           }
+           else {
+             @command = ( $ssh, $host, $opts{perl} || "perl" );
+           }
         }
         
         my ( $readpipe, $writepipe );
@@ -202,6 +215,7 @@ EOREMOTE
            }
            else {
               $_[0] = <$readpipe>;
+              die "Premature EOF received" unless defined($_[0]);
               length( $_[0] );
            }
         };
@@ -230,7 +244,7 @@ EOREMOTE
      $USES .= "use $_;\n" for @$uses;
 
      # Now stream it the "firmware"
-     $writefunc->( RemoteProgram( # Watch the order!!!. TODO: use named parameters
+     my $remoteprogram = RemoteProgram( # Watch the order!!!. TODO: use named parameters
          $USES,
          $REMOTE_LIBRARY,
          $class, 
@@ -244,8 +258,11 @@ EOREMOTE
          $sendstdout, 
          $cleanup, 
          $prefix,
-       ) 
-     );
+         $portdebug,
+     ); 
+     #print "$remoteprogram\n" if $portdebug;
+
+     $writefunc->( $remoteprogram );
 
      my $self = {
         host       => $host,
@@ -280,6 +297,8 @@ EOREMOTE
      my @includes = @{$opts{includes}};
      $self->include($_) for @includes;
 
+     $self->send_operation("GRID::Machine::DEBUG_LOAD_FINISHED") if $portdebug;
+
      return $self;
   }
 } # end of closure
@@ -309,6 +328,12 @@ sub eval {
    my $self = shift;
    my ( $code, @args ) = @_;
 
+#   my ($package, $filename, $line) = caller;
+#   $code = <<"EOCODE";
+#package $package;
+##line $line "$filename"
+#$code
+#EOCODE
    $self->send_operation( "GRID::Machine::EVAL", $code, \@args );
 
    return $self->_get_result();
