@@ -2,10 +2,11 @@ package GRID::Machine;
 use strict;
 use Data::Dumper;
 use List::Util qw(first);
-use Scalar::Util qw(blessed);
-use Cwd;
+use Scalar::Util qw(blessed reftype);
+use Cwd qw{getcwd abs_path};
 use IO::File;
 use File::Spec;
+use File::Path;
 
 $| = 1;
 
@@ -34,6 +35,8 @@ sub send_result {
 
   # List of legal attributes
   my @legal = qw(
+    cleanfiles
+    cleandirs
     cleanup 
     clientpid
     command
@@ -179,6 +182,11 @@ sub send_result {
       # Used to store remote files (see GRID::Machine::RIOHandle)
       FILES     => [],
 
+      # List of absolute names of temporary files
+      cleanfiles => [],
+      # List of absolute names of temporary directories
+      cleandirs => [],
+
       # Used to store remote subroutines. A remote sub is a GRID::Machine::RemoteSub object
       stored_procedures => {},
       debug => $debug,
@@ -206,7 +214,10 @@ sub send_result {
 sub QUIT {  
     my $server = shift;
 
+    $server->DESTROY;
     $server->send_operation( "RETURNED");
+
+    # It is not being called upon termination!
     exit( 0 ) 
 }
 
@@ -492,6 +503,22 @@ sub DESTROY {
 
   unlink $self->{log} if -w  $self->{log} and $self->{cleanup};
   unlink $self->{err} if -w  $self->{err} and $self->{cleanup};
+
+  my $cleanfiles = $self->cleanfiles;
+  if (reftype($cleanfiles) eq 'ARRAY') {
+    while (@{$cleanfiles}) { 
+      $_ = shift @{$cleanfiles};
+      unlink $_;
+    }
+  }
+
+  my $cleandirs = $self->cleandirs;
+  if (reftype($cleandirs) eq 'ARRAY') {
+    while (@{$cleandirs}) { 
+      $_ = shift @{$cleandirs};
+      rmtree $_;
+    }
+  }
 }
 
 #########  Remote main() #########

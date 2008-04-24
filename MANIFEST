@@ -140,4 +140,6 @@ examples/manyevals.pl
 examples/pipes1.pl
 examples/pipes.pl
 examples/pipes2.pl
+examples/gridpipes.pl
+examples/perldb
 META.yml                                 Module meta-data (added by MakeMaker)

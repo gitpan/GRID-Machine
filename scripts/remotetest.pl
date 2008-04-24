@@ -35,15 +35,18 @@ die "Usage:\n$0 distribution.tar.gz machine1 machine2 ... \n" unless @ARGV;
 for my $host (@ARGV) {
 
   my $m = eval { 
-    GRID::Machine->new(host => $host, uses  => [ qw{File::Spec} ]) 
+    GRID::Machine->new(host => $host) 
   };
 
   warn "Cant' create GRID::Machine connection with $host\n", next unless UNIVERSAL::isa($m, 'GRID::Machine');
 
   my $r = $m->eval(q{ 
-      chdir(File::Spec->tmpdir) or die "Can't change to dir ".File::Spec->tmpdir."\n"; 
+      our $tmpdir = File::Temp::tempdir;
+      chdir($tmpdir) or die "Can't change to dir <$tmpdir>\n"; 
     }
   );
+
+  warn($r),next unless $r->ok;
 
   my $preamble = $host.".preamble.pl";
   if (-r $preamble) {
@@ -53,8 +56,6 @@ for my $host (@ARGV) {
     $r = $m->eval($code);
     warn("Error in $host preamble: $r"),next unless $r->ok;
   }
-
-  warn($r),next unless $r->ok;
 
   $m->put([$dist]) or die "Can't copy distribution in $host\n";
 
@@ -88,6 +89,13 @@ for my $host (@ARGV) {
   next unless $m->run('perl Makefile.PL');
   next unless $m->run('make');
   next unless $m->run('make test');
+
+  # Clean files
+  $m->eval( q{
+    our $tmpdir;
+    chdir "$tmpdir/..";
+    system ('rm -fR $dir');
+  });
 }
 
 =head1 NAME
@@ -118,7 +126,7 @@ loaded and evaluated before running the tests in C<machine1.domain>
 
 I have a file named C<beowulf.preamble.pl> in the ditribution directory:
 
-pp2@nereida:~/LGRID_Machine$ cat -n beowulf.preamble.pl
+  pp2@nereida:~/LGRID_Machine$ cat -n beowulf.preamble.pl
      1  $ENV{GRID_REMOTE_MACHINE} = "orion";
 
 Now when I run C<remotetest.pl> for a distribution in machine C<beowulf>

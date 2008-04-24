@@ -2879,7 +2879,11 @@ argument of C<new>. These files can only contain
 
 =over 2
 
-=item * Subroutines
+=item * Subroutines. Since these subroutines are anonymous in the remote side,
+the only way to call them from the remote side is through the attribute
+C<stored_procedures> of the C<SERVER> object:
+
+                    SERVER->stored_procedures->{subname}
 
 =item * C<use Module> declarations. The C<Module> must exists in the remote
 server

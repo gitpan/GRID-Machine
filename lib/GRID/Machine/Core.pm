@@ -1,11 +1,65 @@
 use strict;
 use warnings;
+use File::Temp;
 
 sub getcwd { return getcwd() }
 
 sub chdir  { 
  my $dir = shift || $ENV{HOME};
  return chdir($dir) 
+}
+
+sub unlink  { 
+ my @files = @_;
+
+ return unless @files;
+ return unlink(@files) 
+}
+
+sub mark_as_clean {
+  my %arg = @_;
+  my $files = $arg{files} || [];
+  my $dirs  = $arg{dirs} || [];
+
+  if (@$files) {
+    # make them absolute paths
+    my @absfiles = map { abs_path($_) } @$files;
+    push @{SERVER()->cleanfiles}, @absfiles;
+  }
+  if (@$dirs) {
+    my @absdirs = map { abs_path($_) } @$dirs;
+    push @{SERVER()->cleandirs}, @absdirs;
+  }
+}
+
+sub wrapexec {
+  my $exec = shift;
+
+  my $dir = getcwd;
+
+  $exec =~ /^(\S+)/;
+  my $execname = $1;
+  # Executable can be in any place of the PATH search 
+  #die "Error. Can't find executable name\n" unless  $execname && -x $execname;
+
+  my ($name) = $execname =~ m{([\w.]+)$};
+  $name ||= '';
+
+  my $ENV = '"'.(join '","', %ENV).'"';
+
+  my $filename = "gridmachine_driver_${name}";
+  my $tmp = File::Temp->new( TEMPLATE => $filename.'XXXXX', DIR => '/tmp', UNLINK => 0);
+  my $scriptname = $tmp->filename;
+
+  print $tmp <<"EOF";
+chdir "$dir" || die "Can't change to dir $dir\\\n";
+\%ENV = ($ENV);
+exec("$exec") or die "Can't execute $exec\\\n";
+EOF
+
+   push @{SERVER->cleanfiles}, $scriptname;
+   close($tmp);
+   return $scriptname;
 }
 
 sub umask  { 

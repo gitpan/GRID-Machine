@@ -1,3 +1,6 @@
+* Document 
+     - open (RIO handles) with input and output pipes
+     - copyandmake
 * Write a debugger
 
 * evalfile: read file and eval

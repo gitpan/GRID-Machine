@@ -1,0 +1,28 @@
+#sub ::beval {
+#  print DB::OUT 'b GRID::Machine::EVAL $_[1] =~ m{'.$_[0].'}'
+#}
+
+sub ::get_stdout_name {
+  my $a = `ls rperl*$$*.log`;
+  chomp($a);
+  $a;
+}
+
+sub ::sys {
+  my $command = shift;
+  
+  $var = `$command`;
+  print DB::OUT $var;
+}
+
+#our %alias;
+$alias{beval} = 's/beval\s+(.+)/b GRID::Machine::EVAL \$_[1] =~ m{$1}/';
+$alias{bsub}  = 's/bsub\s+(.+)/b GRID::Machine::CALL \$_[1] =~ m{$1}/';
+$alias{fg}  = 's/fg\s+(\d+)/f eval $1/';
+$alias{whatf} = 's/whatf\s+(.+)/x SERVER->{stored_procedures}{$1}/';
+$alias{stdout} = q{s/stdout/::get_stdout_name()/e};
+$alias{cgs} = 's/cgs\s+(.+)/c GRID::Machine::$1/';
+$alias{'!!'} = 's/!!\s*(.+)/p `$1`/';
+$alias{main} = 's/main/c GRID::Machine::main/';
+$alias{new} = 's/new/c GRID::Machine::new/';
+$alias{crs} = 's/crs/c GRID::Machine::eval_and_read_stdfiles/';

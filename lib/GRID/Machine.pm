@@ -12,6 +12,7 @@ use Module::Which;
 use IPC::Open2;
 use Carp;
 use File::Spec;
+use IO::File;
 use base qw(Exporter);
 use GRID::Machine::IOHandle;
 require Cwd;
@@ -23,7 +24,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.090";
+our $VERSION = "0.091";
 
 sub read_modules {
 
@@ -555,7 +556,8 @@ sub _slurp_file {
         my $alias = $name;
         $alias = $alias{$name} if defined($alias{$name});
         unless ($exclude{$name}) {
-          $self->sub($alias, $code)->ok or die "Can't compile sub '$alias' in ".$self->host."\n";
+          my $r = $self->sub($alias, $code);
+          $r->ok or die "Can't compile sub '$alias' in ".$self->host.":\n$r\n";
         }
       }
     }
@@ -776,8 +778,71 @@ sub module_transfer {
   $self->chdir($olddir);
 }
 
+# Warning! needs more exception control
+# Must be based on rsync instead of put
+# Include tar.gz case: expand automatically
+# and use the corresponding directory
+# perhaps a hook callback after the fileswere transferred?
+# Control de args: check!!
+sub copyandmake {
+  my $m = shift;
+  my %arg = @_;
+
+  my $dir = $arg{dir} || die "copyandmake error: Provide a directory\n";
+  my $target = $arg{target} || '';
+  my $files = $arg{files} || [];
+  my $make = $arg{make} || 'make';
+  my $makeargs = $arg{makeargs} || '';
+  my $cleanfiles = $arg{cleanfiles} || 0;
+  my $cleandirs = $arg{cleandirs} || 0;
+
+  $m->mkdir($dir) unless $m->_x($dir)->result;
+
+  $m->mark_as_clean(dirs=> [ $dir ]) if $cleandirs;
+
+  $m->chdir($dir);
+
+  # Must be done after changing directory ...
+  $m->mark_as_clean(files=>$files) if $cleanfiles;
+
+  unless ($m->_x($target)->result) {
+    if (@$files) { 
+      $m->put($files);
+    }
+    $m->system("$make $makeargs");
+  }
+}
+
+sub openpipe {
+  my $machine = shift;
+  my $exec = shift;
+  my $mode = shift;
+
+  my $host = $machine->host;
+  my $ssh = $machine->ssh;
+
+  my $r = $machine->wrapexec($exec);
+  die $r unless $r->ok;
+
+  my $scriptname = $r->result;
+
+  my $command = "$ssh $host perl $scriptname";
+  $command = $mode? "$command |" : "| $command";
+
+  my $proc = IO::File->new;
+  my $pid = open($proc, $command) || die "Can't open <$ssh $host perl $scriptname>\n";
+
+  return (wantarray ? ($proc, $pid) : $proc);
+}
+
 sub open {
   my ($self, $descriptor) = @_;
+
+  # Output pipe
+  return $self->openpipe($descriptor, 1) if ($descriptor =~ s{\|\s*$}{}); 
+
+  # Input pipe
+  return $self->openpipe($descriptor, 0) if ($descriptor =~ s{^\s*\|}{}); 
 
   $self->send_operation( "GRID::Machine::OPEN", $descriptor );
 
