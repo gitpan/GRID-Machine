@@ -34,6 +34,7 @@ lib/GRID/Machine/Core.pod
 lib/GRID/Machine/Message.pod
 lib/GRID/Machine/REMOTE.pod
 lib/GRID/Machine/Result.pod
+lib/GRID/Machine/Tutorial.pod
 examples/2machines.pl
 examples/accessobject.pl
 examples/alias.pl

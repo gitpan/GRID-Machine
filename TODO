@@ -1,3 +1,4 @@
+* sub x : public (install a synonym of the sub in the hash)
 * Document 
      - open (RIO handles) with input and output pipes
      - copyandmake
@@ -8,9 +9,9 @@
 * if exists a file .grid_machine/machine the options will be read from that file?
 
 * RIO: remote files are now an integer. It does not work with IO::select.
-  It is more transparent if it is a file on the local side. 
-  Whatever is read on the remote side
-  is written on the local fileand then read it again?
+  It is more transparent if it is a "file" on the local side. It will be a process
+  that runs in a pipe.
+  REMEMBER TO CONTROL SIGPIPE
 
 * Be sure to kill nc in the remote machine when hangs
 * Write a loader or booter. 

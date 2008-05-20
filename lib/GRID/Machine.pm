@@ -24,7 +24,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.091";
+our $VERSION = "0.092";
 
 sub read_modules {
 
@@ -791,15 +791,19 @@ sub copyandmake {
   my $dir = $arg{dir} || die "copyandmake error: Provide a directory\n";
   my $target = $arg{target} || '';
   my $files = $arg{files} || [];
-  my $make = $arg{make} || 'make';
+  my $existsmakefile  = first { $_ eq 'Makefile' } @$files;
+  my $make = $existsmakefile ? 'make' : '';
+  $make = $arg{make} if defined($arg{make});
   my $makeargs = $arg{makeargs} || '';
   my $cleanfiles = $arg{cleanfiles} || 0;
   my $cleandirs = $arg{cleandirs} || 0;
+  my $keepdir = $arg{keepdir} || 0;
 
   $m->mkdir($dir) unless $m->_x($dir)->result;
 
   $m->mark_as_clean(dirs=> [ $dir ]) if $cleandirs;
 
+  my $olddir = $m->getcwd();
   $m->chdir($dir);
 
   # Must be done after changing directory ...
@@ -809,10 +813,16 @@ sub copyandmake {
     if (@$files) { 
       $m->put($files);
     }
-    $m->system("$make $makeargs");
+    if ($make) {
+      my $r = $m->system("$make $makeargs");
+      die "copyandmake error while executing $make $makeargs $!" unless $r->ok;
+    }
   }
+
+  $m->chdir($olddir) if $keepdir;
 }
 
+# Add a SIGPIPE handler
 sub openpipe {
   my $machine = shift;
   my $exec = shift;
@@ -835,6 +845,7 @@ sub openpipe {
   return (wantarray ? ($proc, $pid) : $proc);
 }
 
+# Add a SIGPIPE handler
 sub open {
   my ($self, $descriptor) = @_;
 

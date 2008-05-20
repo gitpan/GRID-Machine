@@ -20,7 +20,7 @@ my @pid;  # List of process pids
 my @proc; # List of handles
 my %id;   # Gives the ID for a given handle
 
-my $cleanup = 0;
+my $cleanup = 1;
 
 my $pi = 0;
 
@@ -34,10 +34,10 @@ for (@machine){
       dir => 'pi', 
       makeargs => 'pi', 
       files => [ qw{pi.c Makefile} ], 
-      #cleanfiles => 1,
-      #cleandirs => 1, # remove the whole directory at the end
+      cleanfiles => $cleanup,
+      cleandirs => $cleanup, # remove the whole directory at the end
     )
-  unless -x 'pi/pi';
+  unless $m->_x("pi/pi")->result; 
 
   die "Can't execute 'pi'\n" unless $m->_x("pi")->result;
 
@@ -58,7 +58,7 @@ for (0..$lp) {
 my @ready;
 my $count = 0;
 do {
-  push @ready, $readset->can_read;
+  push @ready, $readset->can_read unless @ready;
   my $handle = shift @ready;
 
   my $me = $id{0+$handle};
@@ -84,7 +84,6 @@ real    0m27.020s
 user    0m0.036s
 sys     0m0.008s
 
-
 casiano@beowulf:~$ time ssh orion 'pi/pi 0 1000000000 1'
 3.141593
 
@@ -92,14 +91,12 @@ real    0m29.120s
 user    0m0.028s
 sys     0m0.003s
 
-
 pp2@nereida:~/LGRID_Machine/examples$ time ssh nereida 'pi/pi 0 1000000000 1'
 3.141593
 
 real    0m32.534s
 user    0m0.036s
 sys     0m0.008s
-
 
 pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 1 1000000000
 Process 0: machine = beowulf partial = 3.141593 pi = 3.141593

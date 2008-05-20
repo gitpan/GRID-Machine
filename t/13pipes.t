@@ -13,7 +13,7 @@ BEGIN {
 my $host = $ENV{GRID_REMOTE_MACHINE};
 
 SKIP: {
-    skip "Remote not operative", 14 unless 
+    skip "Remote not operative or Test::Exception isn't installed or no linux", 14 unless 
       ($host and $test_exception_installed and is_operative('ssh', $host) and ( $^O eq 'linux'));
 
     my $m;
@@ -23,7 +23,7 @@ SKIP: {
 
     my $i;
     my $f;
-    Test::Exception::lives_ok { $f = $m->open('| sort -n') } "No fatals opening not redirected output pipe";
+    Test::Exception::lives_ok { $f = $m->open('| sort -n > /dev/null') } "No fatals opening not redirected output pipe";
     for($i=10; $i>=0;$i--) {
       Test::Exception::lives_ok { $f->print("$i\n") } "No fatals sending to pipe $i";
     }

@@ -84,7 +84,7 @@ between machines
 
 =head1 INSTALLATION
 
-To install this module, follow these two steps:
+To install L<GRID::Machine>, follow these steps:
 
 =over 2
 
@@ -96,9 +96,11 @@ verify a challenge signed by the user's I<private key> against its copy
 of the user's I<publick key>. To achieve this automatic ssh-authentication
 you have to:
 
+=over 2
+
 =item * Generate a public key use the C<ssh-keygen> utility. For example:
 
-  $ ssh-keygen -t rsa -N ''
+  local.machine$ ssh-keygen -t rsa -N ''
 
 The option C<-t> selects the type of key you want to generate.
 There are three types of keys: I<rsa1>, I<rsa> and I<dsa>.
@@ -118,18 +120,25 @@ By default, your identification will be saved in a file C</home/user/.ssh/id_rsa
 Your public key will be saved in C</home/user/.ssh/id_rsa.pub>.
 
 =item * Once you have generated a key pair, you must install the public key on the 
-remote machine. To do it, append the public component of the key C</home/user/.ssh/id_rsa.pub>
-to file C</home/user/.ssh/authorized_keys> on the remote machine.
+remote machine. To do it, append the public component of the key in
+
+           /home/user/.ssh/id_rsa.pub
+
+to file 
+
+           /home/user/.ssh/authorized_keys
+           
+on the remote machine.
 If the C<ssh-copy-id> script is available, you can do it using:
 
-  $ ssh-copy-id -i ~/.ssh/id_rsa.pub user@machine1
+  local.machine$ ssh-copy-id -i ~/.ssh/id_rsa.pub user@remote.machine
 
 Alternatively you can write the following command:
 
   $ ssh remote.machine "umask 077; cat >> .ssh/authorized_keys" < /home/user/.ssh/id_rsa.pub
 
 The C<umask> command is needed since the SSH server will refuse to 
-read a C<home/user/.ssh/authorized_keys> files which have loose permissions.
+read a C</home/user/.ssh/authorized_keys> files which have loose permissions.
 
 =item * Edit your local C</home/.ssh/config> file and add lines like:
 
@@ -150,6 +159,21 @@ authenticate using your private key
   Last login: Sat Jul  7 13:34:00 2007 from local.machine
   user@remote.machine:~$                                 
 
+You can also automatically execute commands in the remote server:
+
+  local.machine$ ssh remote.machine uname -a
+  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686 GNU/Linux
+
+=item * Once you have installed L<GRID::Machine> you can check that C<perl> can
+be executed in that machine using this one-liner:
+
+  $ perl -e 'use GRID::Machine qw(is_operative); print is_operative("ssh", "beowulf")."\n"'
+  1
+
+=back
+
+
+
 
 =item  * Before running the tests. Set on the local machine the environment variable 
 C<GRID_REMOTE_MACHINE> to point to a machine that is available using automatic authenticatication. 
@@ -167,6 +191,9 @@ Otherwise most connectivity tests will be skipped. This and the previous steps a
    make install
 
 =back
+
+
+
 
 =head1 DEPENDENCIES
 

@@ -16,25 +16,30 @@ WriteMakefile(
 );
 
 sub MY::postamble {
-my @files = (
-  'TODO',
-  'lib/GRID/Machine.pm',
-  'lib/GRID/Machine/Core.pm',
-#  'lib/GRID/Machine/MakeAccessors.pm',
-  'lib/GRID/Machine/Message.pm',
-  'lib/GRID/Machine/REMOTE.pm',
-#  'lib/GRID/Machine/Request.pm',
-  'lib/GRID/Machine/Result.pm',
-   'lib/GRID/Machine/IOHandle.pm',
-   'lib/GRID/Machine/RIOHandle.pm',
-#  'examples/MyLocal.pm',
-#  'examples/MyRemote.pm',
-#  'examples/extendprotocol.pl',
-#  'examples/synopsis',1'.pl',
-#  'examples/gprint.pl',
-#  'examples/nestedcallback.pl',
-#  'examples/salida',
-);
+  # To check tests in remote machines. See goal remotetest
+	my @machines = qw{orion beowulf};
+
+	# To print: see goal pdf
+	my @files = (
+		'TODO',
+		'lib/GRID/Machine.pm',
+		'lib/GRID/Machine/Core.pm',
+	#  'lib/GRID/Machine/MakeAccessors.pm',
+		'lib/GRID/Machine/Message.pm',
+		'lib/GRID/Machine/REMOTE.pm',
+	#  'lib/GRID/Machine/Request.pm',
+		'lib/GRID/Machine/Result.pm',
+		 'lib/GRID/Machine/IOHandle.pm',
+		 'lib/GRID/Machine/RIOHandle.pm',
+	#  'examples/MyLocal.pm',
+	#  'examples/MyRemote.pm',
+	#  'examples/extendprotocol.pl',
+	#  'examples/synopsis',1'.pl',
+	#  'examples/gprint.pl',
+	#  'examples/nestedcallback.pl',
+	#  'examples/salida',
+	);
+
 return <<"EOT";
 doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
 	cd tt2; tpage  Machine.tt2 > ../lib/GRID/Machine.pod
@@ -43,6 +48,7 @@ doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
 	cd tt2; tpage  Core.tt2 > ../lib/GRID/Machine/Core.pod
 	cd tt2; tpage  Result.tt2 > ../lib/GRID/Machine/Result.pod
 	cd tt2; tpage  IOHandle.tt2 > ../lib/GRID/Machine/IOHandle.pod
+	cd tt2; tpage  Tutorial.tt2 > ../lib/GRID/Machine/Tutorial.pod
 
 pdf: @files
 	atopdf @files -o /tmp/gridmachine.pdf
@@ -66,16 +72,25 @@ xdvi: doc
 	latex IOHandle
 	latex IOHandle
 	makeindex IOHandle; latex IOHandle.tex 
+	pod2latex -full -prefile preamble.tex lib/GRID/Machine/Tutorial.pod
+	latex Tutorial
+	latex Tutorial
+	makeindex Tutorial; latex Tutorial.tex 
 
 html: doc
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/Core.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/REMOTE.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/IOHandle.pod
+	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/Tutorial.pod
+	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc scripts/remotetest.pl
 
 publish: doc html xdvi
 	cp *.html /home/pp2/public_html/GRID_Machine/
 	cp *.dvi /home/pp2/public_html/GRID_Machine/
+
+remotetest:
+	scripts/remotetest.pl \${DISTVNAME}.tar.gz @machines
 EOT
 }
 

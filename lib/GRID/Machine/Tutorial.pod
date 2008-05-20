@@ -1,0 +1,555 @@
+=head1 NAME
+
+GRID::Machine::perlparintro - A basic introduction to Parallel Computing in Perl
+
+=head1 SYNOPSIS
+
+=head2 The Driver: File C<gridpipes.pl>
+
+  $ cat  gridpipes.pl
+  #!/usr/bin/perl
+  use warnings;
+  use strict;
+  use IO::Select;
+  use GRID::Machine;
+  use Time::HiRes qw(time gettimeofday tv_interval);
+
+  my @machine = qw{beowulf orion nereida};
+  my $nummachines = @machine;
+  my %machine; # Hash of GRID::Machine objects
+  #my %debug = (beowulf => 12345, orion => 0, nereida => 0);
+  my %debug = (beowulf => 0, orion => 0, nereida => 0);
+
+  my $np = shift || $nummachines; # number of processes
+  my $lp = $np-1;
+
+  my $N = shift || 100;
+
+  my @pid;  # List of process pids
+  my @proc; # List of handles
+  my %id;   # Gives the ID for a given handle
+
+  my $cleanup = 0;
+
+  my $pi = 0;
+
+  my $readset = IO::Select->new();
+
+  my $i = 0;
+  for (@machine){
+    my $m = GRID::Machine->new(host => $_, debug => $debug{$_}, );
+
+      $m->copyandmake(
+        dir => 'pi',
+        makeargs => 'pi',
+        files => [ qw{pi.c Makefile} ],
+        cleanfiles => $cleanup,
+        cleandirs => $cleanup, # remove the whole directory at the end
+      )
+    unless $m->_x("pi/pi")->result;
+
+    die "Can't execute 'pi'\n" unless $m->_x("pi")->result;
+
+    $machine{$_} = $m;
+    last unless $i++ < $np;
+  }
+
+  my $t0 = [gettimeofday];
+  for (0..$lp) {
+    my $hn = $machine[$_ % $nummachines];
+    my $m = $machine{$hn};
+    ($proc[$_], $pid[$_]) = $m->open("./pi $_ $N $np |");
+    $readset->add($proc[$_]);
+    my $address = 0+$proc[$_];
+    $id{$address} = $_;
+  }
+
+  my @ready;
+  my $count = 0;
+  do {
+    push @ready, $readset->can_read unless @ready;
+    my $handle = shift @ready;
+
+    my $me = $id{0+$handle};
+
+    my ($partial);
+    my $numBytesRead = sysread($handle,  $partial, 1024);
+    chomp($partial);
+
+    $pi += $partial;
+    print "Process $me: machine = $machine[$me % $nummachines] partial = $partial pi = $pi\n";
+
+    $readset->remove($handle) if eof($handle);
+  } until (++$count == $np);
+
+  my $elapsed = tv_interval ($t0);
+  print "Pi = $pi. N = $N Time = $elapsed\n";
+
+=head2 The Application. File C<pi.c>
+
+  $ cat pi.c
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  main(int argc, char **argv) {
+    int id, N, np, i;
+    double sum, left;
+
+    if (argc != 4) {
+      printf("Uso:\n%s id N np\n",argv[0]);
+      exit(1);
+    }
+    id = atoi(argv[1]);
+    N = atoi(argv[2]);
+    np = atoi(argv[3]);
+    for(i=id, sum = 0; i<N; i+=np) {
+      double x = (i + 0.5)/N;
+      sum += 4 / (1 + x*x);
+    }
+    sum /= N;
+    printf("%lf\n", sum);
+  }
+
+=head2 Makefile
+
+  $ cat Makefile
+  pi:
+          cc pi.c -o pi
+
+=head2 Running
+
+    $ time gridpipes.pl 1 1000000000
+    Process 0: machine = beowulf partial = 3.141593 pi = 3.141593
+    Pi = 3.141593. N = 1000000000 Time = 27.058693
+
+    real    0m28.917s
+    user    0m0.584s
+    sys     0m0.192s
+
+    pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 2 1000000000
+    Process 0: machine = beowulf partial = 1.570796 pi = 1.570796
+    Process 1: machine = orion partial = 1.570796 pi = 3.141592
+    Pi = 3.141592. N = 1000000000 Time = 15.094719
+
+    real    0m17.684s
+    user    0m0.904s
+    sys     0m0.260s
+
+
+    pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 3 1000000000
+    Process 0: machine = beowulf partial = 1.047198 pi = 1.047198
+    Process 1: machine = orion partial = 1.047198 pi = 2.094396
+    Process 2: machine = nereida partial = 1.047198 pi = 3.141594
+    Pi = 3.141594. N = 1000000000 Time = 10.971036
+
+    real    0m13.700s
+    user    0m0.952s
+    sys     0m0.240s
+
+
+
+=head1 SUMMARY
+
+Do you like Perl? What about having perl interpreters running in 
+those computers you have an account and make them to 
+collaborate to give you more computational power (and more fun)?
+
+This tutorial introduces the basics of parallel computing by means of 
+a simple program that distributes 
+the evaluation of some mathematical expression between several machines. 
+The computational results show that - when the problem is large enough -
+a substantial improving is gained in performance: The execution times
+is reduced to the half by using two machines.
+This tutorial also introduces a set of techniques used to debug 
+parallel perl code that is being executed in a I<Remote> computer.
+
+=head1 REQUIREMENTS
+
+To experiment with the examples in this tutorial 
+you will need at least two Unix machines with Perl and SSH.
+If you are not familiar with Perl or Linux this module probably
+isn't for you.
+If you are not familiar with SSH, see 
+
+=over 2
+
+=item * I<SSH, The Secure Shell: The Definitive Guide> by Daniel J. Barrett   
+and Richard E. Silverman. O'Reilly
+
+=item * L<http://www.openssh.com>
+
+=item * Man pages of C<ssh>, C<ssh-key-gen>, C<ssh_config>, C<scp>, 
+C<ssh-agent>, C<ssh-add>, C<sshd>
+
+=item * L<http://www.ssh.com>
+
+=item * Linux Focus article L<http://tldp.org/linuxfocus/English/Archives/lf-2003_01-0278.pdf>
+by Erdal Mutlu I<Automating system administration with ssh and scp>
+
+=back
+
+
+=head1 BUILDING A "FUZZY" PARALLEL CLUSTER: INTRODUCTION TO AUTOMATIC AUTHENTICATION WITH SSH
+
+SSH includes the ability to authenticate users using public keys. Instead of 
+authenticating the user with a password, the SSH server on the remote machine will
+verify a challenge signed by the user's I<private key> against its copy
+of the user's I<publick key>. To achieve this automatic ssh-authentication
+you have to:
+
+=over 2
+
+=item * Generate a public key use the C<ssh-keygen> utility. For example:
+
+  local.machine$ ssh-keygen -t rsa -N ''
+
+The option C<-t> selects the type of key you want to generate.
+There are three types of keys: I<rsa1>, I<rsa> and I<dsa>.
+The C<-N> option is followed by the I<passphrase>. The C<-N ''> setting
+indicates that no pasphrase will be used. This is useful when used 
+with key restrictions or when dealing with cron jobs, batch 
+commands and automatic processing which is the context in which this 
+module was designed.
+If still you don't like to have a private key without passphrase, 
+provide a passphrase and use C<ssh-agent> 
+to avoid the inconvenience of typing the passphrase each time. 
+C<ssh-agent> is a program you run once per login sesion and load your keys into.
+From that moment on, any C<ssh> client will contact C<ssh-agent>
+and no more passphrase typing will be needed.
+
+By default, your identification will be saved in a file C</home/user/.ssh/id_rsa>.
+Your public key will be saved in C</home/user/.ssh/id_rsa.pub>.
+
+=item * Once you have generated a key pair, you must install the public key on the 
+remote machine. To do it, append the public component of the key in
+
+           /home/user/.ssh/id_rsa.pub
+
+to file 
+
+           /home/user/.ssh/authorized_keys
+           
+on the remote machine.
+If the C<ssh-copy-id> script is available, you can do it using:
+
+  local.machine$ ssh-copy-id -i ~/.ssh/id_rsa.pub user@remote.machine
+
+Alternatively you can write the following command:
+
+  $ ssh remote.machine "umask 077; cat >> .ssh/authorized_keys" < /home/user/.ssh/id_rsa.pub
+
+The C<umask> command is needed since the SSH server will refuse to 
+read a C</home/user/.ssh/authorized_keys> files which have loose permissions.
+
+=item * Edit your local C</home/.ssh/config> file and add lines like:
+
+ Host remote.machine
+ user my_login_in_the_remote_machine
+
+ Host another.remote.machine an.alias.for.this.machine
+ user mylogin_there
+
+This way you don't have to specify your I<login> name on the remote machine even if it
+differs from your  I<login> name in the local machine.
+
+=item * Once the public key is installed on the server you should be able to
+authenticate using your private key
+
+  $ ssh remote.machine
+  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686
+  Last login: Sat Jul  7 13:34:00 2007 from local.machine
+  user@remote.machine:~$                                 
+
+You can also automatically execute commands in the remote server:
+
+  local.machine$ ssh remote.machine uname -a
+  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686 GNU/Linux
+
+=item * Once you have installed L<GRID::Machine> you can check that C<perl> can
+be executed in that machine using this one-liner:
+
+  $ perl -e 'use GRID::Machine qw(is_operative); print is_operative("ssh", "beowulf")."\n"'
+  1
+
+=back
+
+
+
+
+=head1 A PARALLEL ALGORITHM 
+
+We are going to compute an approach to the number Pi (3.14159...) using 
+numerical integration. Namely the area under the curve 1/(1+x**2) between 0 and 1
+is C<Pi/4 = (3.1415...)/4> as it shows the following debugger session: 
+
+
+  pp2@nereida:~/public_html/cgi-bin$ perl -wde 0
+  main::(-e:1):   0
+    DB<1>  use Math::Integral::Romberg 'integral'
+    DB<2> p integral(sub { my $x = shift; 4/(1+$x*$x) }, 0, 1);
+  3.14159265358972
+
+The module L<Math::Integral::Romberg> provides the function C<integral> 
+that allow us to compute the area of a given function in some 
+interval. In fact - if you remember your high
+school days - it is easy to see the reason: the integral of C<4/(1+$x*$x)> is
+C<4*arctg($x)> and so its area between 0 and 1 is given by:
+
+        4*(arctg(1) - arctg(0)) = 4 * arctg(1) = 4 * Pi / 4 = Pi
+
+
+This is not, in fact, a good way to compute Pi, but makes a good example
+of how to exploit several machines to fulfill a task. 
+
+To compute the area under C<4/(1+$x*$x)> we can divide up the interval C<[0,1]>
+into sub-intervals of size C<1/N> and add up the areas of the small
+rectangles with base C<1/N> and height the value of the curve C<4/(1+$x*$x)> in the middle of
+the interval. The following debugger session illustrates the idea:
+
+  pp2@nereida:~$ perl -wde 0
+  main::(-e:1):   0
+  DB<1> use List::Util qw(sum)
+  DB<2> $N = 6
+  DB<3> @divisions = map { $_/$N } 0..($N-1)
+  DB<4> sub f { my $x = shift; 4/(1+$x*$x) }
+  DB<5> @halves = map { $_+0.5/$N } @divisions
+  DB<6> $area = sum(map { f($_)/$N } @halves)
+  DB<7> p $area
+  3.14390742722244
+
+Since our goal is to optimize the execution time, we will distribute
+the sum in line 6 C<$area = sum(map { f($_)/$N } @halves)> among
+the processors. The machines will be numbered from 0 to C<np-1> 
+(being C<np> the number of machines) and each machine will sum up
+the areas of roughly C<N/np> intervals. To achieve  a higher performance
+the code to execute on each machine is written in C:
+
+  pp2@nereida:~/LGRID_Machine/examples$ cat -n pi.c
+     1  #include <stdio.h>
+     2  #include <stdlib.h>
+     3
+     4  main(int argc, char **argv) {
+     5    int id, N, np, i;
+     6    double sum, left;
+     7
+     8    if (argc != 4) {
+     9      printf("Usage:\n%s id N np\n",argv[0]);
+    10      exit(1);
+    11    }
+    12    id = atoi(argv[1]);
+    13    N = atoi(argv[2]);
+    14    np = atoi(argv[3]);
+    15    for(i=id, sum = 0; i<N; i+=np) {
+    16      double x = (i + 0.5)/N;
+    17      sum += 4 / (1 + x*x);
+    18    }
+    19    sum /= N;
+    20    printf("%lf\n", sum);
+    21  }
+
+The program receives (lines 8-14) three arguments: The first one, C<id>,
+identifies the machine with a logical number, the second one, C<N>,
+is the total number of intervals, the third C<np> is the number of 
+machines being used. Notice the C<for> loop at line 15: Processor C<id>
+sums up the areas corresponding to intervals C<id>, C<id+np>,
+C<id+2*np>, etc. The program concludes writing to C<STDOUT> the 
+partial sum. 
+
+Observe that, since we aren't using infinite precision numbers
+errors introduced by rounding and truncation imply that increasing C<N>
+would not lead to a more precise evaluation of Pi.
+
+To get the executable we have a simple C<Makefile>:
+
+  pp2@nereida:~/LGRID_Machine/examples$ cat -n Makefile
+     1  pi:
+     2          cc pi.c -o pi
+
+=head1 COORDINATING A CLUSTER 
+
+The program C<gridpipes.pl> following in the lines
+below runs C<$np> copies of
+the former C program in a set C<@machines> of available
+machines, adding up the partial results as soon as they arrive.
+
+  pp2@nereida:~/LGRID_Machine/examples$ cat -n gridpipes.pl
+     1  #!/usr/bin/perl
+     2  use warnings;
+     3  use strict;
+     4  use IO::Select;
+     5  use GRID::Machine;
+     6  use Time::HiRes qw(time gettimeofday tv_interval);
+
+The first lines load the modules: 
+
+=over 2
+
+=item * L<GRID::Machine> will be used
+to open C<SSH> connections with the remote machines and control 
+the execution environment 
+
+=item * L<IO::Select> will be used
+to process the results as soon as they start to arrive.
+
+=item * L<Time::HiRes> will be used to time the processes so that we
+can compare times and see if there is any gain in this approach
+
+=back
+
+     8  my @machine = qw{beowulf orion nereida};
+     9  my $nummachines = @machine;
+    10  my %machine; # Hash of GRID::Machine objects
+    11  #my %debug = (beowulf => 12345, orion => 0, nereida => 0);
+    12  my %debug = (beowulf => 0, orion => 0, nereida => 0);
+    13
+    14  my $np = shift || $nummachines; # number of processes
+    15  my $lp = $np-1;
+    16
+    17  my $N = shift || 100;
+    18
+    19  my @pid;  # List of process pids
+    20  my @proc; # List of handles
+    21  my %id;   # Gives the ID for a given handle
+    22
+    23  my $cleanup = 0;
+    24
+    25  my $pi = 0;
+    26
+    27  my $readset = IO::Select->new();
+
+Variable C<@machine> stores the IP addresses/names of the machines we have SSH
+access. These machines will constitute our 'virtual' parallel machine. For each
+of these machines (see the for loop in lines 30-46) a SSH connection is created 
+(line 31) via C<GRID::Machine-E<gt>new>. The resulting C<GRID::Machine> objects will be 
+stored inside the hash C<%machine> (line 44).
+
+    29  my $i = 0;
+    30  for (@machine){
+    31    my $m = GRID::Machine->new(host => $_, debug => $debug{$_}, );
+    32
+    33      $m->copyandmake(
+    34        dir => 'pi',
+    35        makeargs => 'pi',
+    36        files => [ qw{pi.c Makefile} ],
+    37        cleanfiles => $cleanup,
+    38        cleandirs => $cleanup, # remove the whole directory at the end
+    39      )
+    40    unless $m->_x("pi/pi")->result;
+    41
+    42    die "Can't execute 'pi'\n" unless $m->_x("pi")->result;
+    43
+    44    $machine{$_} = $m;
+    45    last unless $i++ < $np;
+    46  }
+
+The call to C<copyandmake> at line 33 copies (using C<scp>) the files 
+C<pi.c> and C<Makefile> to a directory named C<pi> in the remote machine.
+The directory C<pi> will be created if it does not exists. After the file transfer
+the C<command> specified by the C<copyandmake> option 
+               
+                     make => 'command' 
+
+will be executed with the arguments specified in the option C<makeargs>. 
+If the C<make> option isn't specified but there is a file named C<Makefile>
+between the transferred files, the C<make> program will be executed. 
+Set the C<make> option to number 0 or the string C<''> if you want to 
+avoid the execution of any command after the transfer.
+The transferred files will be removed when the connection finishes if the
+option C<cleanfiles> is set. More radical, the option C<cleandirs> will remove the 
+created directory and all the files below it. Observe that the directory and the files 
+will be kept if they were'nt created by this connection.
+The call to C<copyandmake> by default sets C<dir> as the current directory in the remote
+machine. Use the option C<keepdir =E<gt> 1> to one to avoid this.
+
+The condition at line 40 checks for the existence of the executable C<pi>:
+No transference will be done if an executable in C<pi/pi> already exists.
+
+
+    48  my $t0 = [gettimeofday];
+    49  for (0..$lp) {
+    50    my $hn = $machine[$_ % $nummachines];
+    51    my $m = $machine{$hn};
+    52    ($proc[$_], $pid[$_]) = $m->open("./pi $_ $N $np |");
+    53    $readset->add($proc[$_]);
+    54    my $address = 0+$proc[$_];
+    55    $id{$address} = $_;
+    56  }
+    57
+    58  my @ready;
+    59  my $count = 0;
+    60  do {
+    61    push @ready, $readset->can_read unless @ready;
+    62    my $handle = shift @ready;
+    63
+    64    my $me = $id{0+$handle};
+    65
+    66    my ($partial);
+    67    my $numBytesRead = sysread($handle,  $partial, 1024);
+    68    chomp($partial);
+    69
+    70    $pi += $partial;
+    71    print "Process $me: machine = $machine[$me % $nummachines] partial = $partial pi = $pi\n";
+    72
+    73    $readset->remove($handle) if eof($handle);
+    74  } until (++$count == $np);
+    75
+    76  my $elapsed = tv_interval ($t0);
+    77  print "Pi = $pi. N = $N Time = $elapsed\n";
+
+
+=head1 PERFORMANCE: COMPUTATIONAL RESULTS
+
+    pp2@nereida:~/LGRID_Machine/examples$ time ssh beowulf 'pi/pi 0 1000000000 1'
+    3.141593
+
+    real    0m27.020s
+    user    0m0.036s
+    sys     0m0.008s
+
+    casiano@beowulf:~$ time ssh orion 'pi/pi 0 1000000000 1'
+    3.141593
+
+    real    0m29.120s
+    user    0m0.028s
+    sys     0m0.003s
+
+    pp2@nereida:~/LGRID_Machine/examples$ time ssh nereida 'pi/pi 0 1000000000 1'
+    3.141593
+
+    real    0m32.534s
+    user    0m0.036s
+    sys     0m0.008s
+
+    pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 1 1000000000
+    Process 0: machine = beowulf partial = 3.141593 pi = 3.141593
+    Pi = 3.141593. N = 1000000000 Time = 27.058693
+
+    real    0m28.917s
+    user    0m0.584s
+    sys     0m0.192s
+
+    pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 2 1000000000
+    Process 0: machine = beowulf partial = 1.570796 pi = 1.570796
+    Process 1: machine = orion partial = 1.570796 pi = 3.141592
+    Pi = 3.141592. N = 1000000000 Time = 15.094719
+
+    real    0m17.684s
+    user    0m0.904s
+    sys     0m0.260s
+
+
+    pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 3 1000000000
+    Process 0: machine = beowulf partial = 1.047198 pi = 1.047198
+    Process 1: machine = orion partial = 1.047198 pi = 2.094396
+    Process 2: machine = nereida partial = 1.047198 pi = 3.141594
+    Pi = 3.141594. N = 1000000000 Time = 10.971036
+
+    real    0m13.700s
+    user    0m0.952s
+    sys     0m0.240s
+
+=head1 CONCLUSIONS
+
+
+=head1 SEE ALSO
+
