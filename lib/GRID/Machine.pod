@@ -93,7 +93,7 @@ To install L<GRID::Machine>, follow these steps:
 SSH includes the ability to authenticate users using public keys. Instead of 
 authenticating the user with a password, the SSH server on the remote machine will
 verify a challenge signed by the user's I<private key> against its copy
-of the user's I<publick key>. To achieve this automatic ssh-authentication
+of the user's I<public key>. To achieve this automatic ssh-authentication
 you have to:
 
 =over 2

@@ -48,7 +48,7 @@ doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
 	cd tt2; tpage  Core.tt2 > ../lib/GRID/Machine/Core.pod
 	cd tt2; tpage  Result.tt2 > ../lib/GRID/Machine/Result.pod
 	cd tt2; tpage  IOHandle.tt2 > ../lib/GRID/Machine/IOHandle.pod
-	cd tt2; tpage  Tutorial.tt2 > ../lib/GRID/Machine/Tutorial.pod
+	cd tt2; tpage  perlparintro.tt2 > ../lib/GRID/Machine/perlparintro.pod
 
 pdf: @files
 	atopdf @files -o /tmp/gridmachine.pdf
@@ -72,17 +72,17 @@ xdvi: doc
 	latex IOHandle
 	latex IOHandle
 	makeindex IOHandle; latex IOHandle.tex 
-	pod2latex -full -prefile preamble.tex lib/GRID/Machine/Tutorial.pod
-	latex Tutorial
-	latex Tutorial
-	makeindex Tutorial; latex Tutorial.tex 
+	pod2latex -full -prefile preamble.tex lib/GRID/Machine/perlparintro.pod
+	latex perlparintro
+	latex perlparintro
+	makeindex perlparintro; latex perlparintro.tex 
 
 html: doc
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/Core.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/REMOTE.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/IOHandle.pod
-	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/Tutorial.pod
+	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/perlparintro.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc scripts/remotetest.pl
 
 publish: doc html xdvi

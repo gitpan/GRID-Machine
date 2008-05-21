@@ -1,122 +1,8 @@
 =head1 NAME
 
-GRID::Machine::perlparintro - A basic introduction to Parallel Computing in Perl
+GRID::Machine::perlparintro - A brief and basic introduction to Parallel Distributed Computing in Perl
 
 =head1 SYNOPSIS
-
-=head2 The Driver: File C<gridpipes.pl>
-
-  $ cat  gridpipes.pl
-  #!/usr/bin/perl
-  use warnings;
-  use strict;
-  use IO::Select;
-  use GRID::Machine;
-  use Time::HiRes qw(time gettimeofday tv_interval);
-
-  my @machine = qw{beowulf orion nereida};
-  my $nummachines = @machine;
-  my %machine; # Hash of GRID::Machine objects
-  #my %debug = (beowulf => 12345, orion => 0, nereida => 0);
-  my %debug = (beowulf => 0, orion => 0, nereida => 0);
-
-  my $np = shift || $nummachines; # number of processes
-  my $lp = $np-1;
-
-  my $N = shift || 100;
-
-  my @pid;  # List of process pids
-  my @proc; # List of handles
-  my %id;   # Gives the ID for a given handle
-
-  my $cleanup = 0;
-
-  my $pi = 0;
-
-  my $readset = IO::Select->new();
-
-  my $i = 0;
-  for (@machine){
-    my $m = GRID::Machine->new(host => $_, debug => $debug{$_}, );
-
-      $m->copyandmake(
-        dir => 'pi',
-        makeargs => 'pi',
-        files => [ qw{pi.c Makefile} ],
-        cleanfiles => $cleanup,
-        cleandirs => $cleanup, # remove the whole directory at the end
-      )
-    unless $m->_x("pi/pi")->result;
-
-    die "Can't execute 'pi'\n" unless $m->_x("pi")->result;
-
-    $machine{$_} = $m;
-    last unless $i++ < $np;
-  }
-
-  my $t0 = [gettimeofday];
-  for (0..$lp) {
-    my $hn = $machine[$_ % $nummachines];
-    my $m = $machine{$hn};
-    ($proc[$_], $pid[$_]) = $m->open("./pi $_ $N $np |");
-    $readset->add($proc[$_]);
-    my $address = 0+$proc[$_];
-    $id{$address} = $_;
-  }
-
-  my @ready;
-  my $count = 0;
-  do {
-    push @ready, $readset->can_read unless @ready;
-    my $handle = shift @ready;
-
-    my $me = $id{0+$handle};
-
-    my ($partial);
-    my $numBytesRead = sysread($handle,  $partial, 1024);
-    chomp($partial);
-
-    $pi += $partial;
-    print "Process $me: machine = $machine[$me % $nummachines] partial = $partial pi = $pi\n";
-
-    $readset->remove($handle) if eof($handle);
-  } until (++$count == $np);
-
-  my $elapsed = tv_interval ($t0);
-  print "Pi = $pi. N = $N Time = $elapsed\n";
-
-=head2 The Application. File C<pi.c>
-
-  $ cat pi.c
-  #include <stdio.h>
-  #include <stdlib.h>
-
-  main(int argc, char **argv) {
-    int id, N, np, i;
-    double sum, left;
-
-    if (argc != 4) {
-      printf("Uso:\n%s id N np\n",argv[0]);
-      exit(1);
-    }
-    id = atoi(argv[1]);
-    N = atoi(argv[2]);
-    np = atoi(argv[3]);
-    for(i=id, sum = 0; i<N; i+=np) {
-      double x = (i + 0.5)/N;
-      sum += 4 / (1 + x*x);
-    }
-    sum /= N;
-    printf("%lf\n", sum);
-  }
-
-=head2 Makefile
-
-  $ cat Makefile
-  pi:
-          cc pi.c -o pi
-
-=head2 Running
 
     $ time gridpipes.pl 1 1000000000
     Process 0: machine = beowulf partial = 3.141593 pi = 3.141593
@@ -150,9 +36,19 @@ GRID::Machine::perlparintro - A basic introduction to Parallel Computing in Perl
 
 =head1 SUMMARY
 
-Do you like Perl? What about having perl interpreters running in 
-those computers you have an account and make them to 
-collaborate to give you more computational power (and more fun)?
+The total computational power of institutions 
+as a whole has dramatically rised in the last decades, but
+due to distributed ownership and administration restrictions, 
+individuals are not able to capitalize such computing power. 
+Many machines sit idle for very long periods of time while 
+their owners are busy doing other things. Many of them run
+some sort of UNIX, have Perl installed and provide SSH access.
+
+If such is your scenario you can use L<GRID::Machine> to
+have perl interpreters running in 
+those nodes and make them collaborate to give you more computational 
+power and more fun. All this without having to ask administrators 
+or having to install any additional software.
 
 This tutorial introduces the basics of parallel computing by means of 
 a simple program that distributes 
@@ -160,8 +56,6 @@ the evaluation of some mathematical expression between several machines.
 The computational results show that - when the problem is large enough -
 a substantial improving is gained in performance: The execution times
 is reduced to the half by using two machines.
-This tutorial also introduces a set of techniques used to debug 
-parallel perl code that is being executed in a I<Remote> computer.
 
 =head1 REQUIREMENTS
 
@@ -189,12 +83,12 @@ by Erdal Mutlu I<Automating system administration with ssh and scp>
 =back
 
 
-=head1 BUILDING A "FUZZY" PARALLEL CLUSTER: INTRODUCTION TO AUTOMATIC AUTHENTICATION WITH SSH
+=head1 BUILDING A "FUZZY" PARALLEL CLUSTER
 
 SSH includes the ability to authenticate users using public keys. Instead of 
 authenticating the user with a password, the SSH server on the remote machine will
 verify a challenge signed by the user's I<private key> against its copy
-of the user's I<publick key>. To achieve this automatic ssh-authentication
+of the user's I<public key>. To achieve this automatic ssh-authentication
 you have to:
 
 =over 2
@@ -464,6 +358,14 @@ machine. Use the option C<keepdir =E<gt> 1> to one to avoid this.
 The condition at line 40 checks for the existence of the executable C<pi>:
 No transference will be done if an executable in C<pi/pi> already exists.
 
+After the involved files are transferred and executables have been built,
+the program proceeds to open C<$np> processes. The call to
+C<open> at line 52 executes the C<pi> program in the remote machine C<$m>. 
+In a list context returns a handler - that can be used to read from the process -
+and the PID of the child process. The new handler C<$proc[$_]>
+is added to the L<IO::Select> object C<$readset> at line 53. 
+The hash C<%id> stores the relation between handlers and 
+logical process identifiers.
 
     48  my $t0 = [gettimeofday];
     49  for (0..$lp) {
@@ -474,7 +376,11 @@ No transference will be done if an executable in C<pi/pi> already exists.
     54    my $address = 0+$proc[$_];
     55    $id{$address} = $_;
     56  }
-    57
+
+During the last stage the master node simply waits in the L<IO::Select>
+object listening on each of the channels. As soon as a result is received
+it is added to the total sum for C<$pi>:
+
     58  my @ready;
     59  my $count = 0;
     60  do {
@@ -499,6 +405,16 @@ No transference will be done if an executable in C<pi/pi> already exists.
 
 =head1 PERFORMANCE: COMPUTATIONAL RESULTS
 
+Let us see the time it takes the execution of the I<pure C> program on each
+of the involved nodes (nereida, beowulf and orion):
+
+    pp2@nereida:~/LGRID_Machine/examples$ time ssh nereida 'pi/pi 0 1000000000 1'
+    3.141593
+
+    real    0m32.534s
+    user    0m0.036s
+    sys     0m0.008s
+
     pp2@nereida:~/LGRID_Machine/examples$ time ssh beowulf 'pi/pi 0 1000000000 1'
     3.141593
 
@@ -513,12 +429,13 @@ No transference will be done if an executable in C<pi/pi> already exists.
     user    0m0.028s
     sys     0m0.003s
 
-    pp2@nereida:~/LGRID_Machine/examples$ time ssh nereida 'pi/pi 0 1000000000 1'
-    3.141593
+As you can see, there is some heterogeneity here. Machine C<nereida> (my desktop)
+is slower than the others two. C<beowulf> is the fastest.
 
-    real    0m32.534s
-    user    0m0.036s
-    sys     0m0.008s
+Now let us run the parallel perl program in C<nereida> using only one node.
+The time spent is roughly comparable to the I<pure C> time. That is nice:
+The overhead introduced by the coordination tasks is not as large (compare it
+with the C<beowulf> entry above):
 
     pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 1 1000000000
     Process 0: machine = beowulf partial = 3.141593 pi = 3.141593
@@ -527,6 +444,8 @@ No transference will be done if an executable in C<pi/pi> already exists.
     real    0m28.917s
     user    0m0.584s
     sys     0m0.192s
+
+Now comes the true test: will it be faster using two nodes? how much?
 
     pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 2 1000000000
     Process 0: machine = beowulf partial = 1.570796 pi = 1.570796
@@ -537,6 +456,11 @@ No transference will be done if an executable in C<pi/pi> already exists.
     user    0m0.904s
     sys     0m0.260s
 
+We can see that the sequential pure C version took 32 seconds in my desktop (C<nereida>).
+By using two machines I have SSH access I have reduced that time to roughly 18 seconds.
+This a factor of C<32/18 = 1.8> times faster. This factor is even better if I
+don't consider the set-up time: C<32/15 = 2.1>. The total time decreases
+if I use the three machines:
 
     pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 3 1000000000
     Process 0: machine = beowulf partial = 1.047198 pi = 1.047198
@@ -548,8 +472,167 @@ No transference will be done if an executable in C<pi/pi> already exists.
     user    0m0.952s
     sys     0m0.240s
 
-=head1 CONCLUSIONS
+which gives a speed factor of C<32/13.7 = 2.3> or not considering
+the set-up time C<32/10.9 = 2.9>.
 
+=head1 CONCLUSIONS, LIMITATIONS AND FUTURE WORK
+
+This example shows how to 
+take advantage of the computational power of idle stations and the very high level 
+of programming offered by Perl to improve the performance of an application.
+High Performance Programming (HPP, as provided by Very High Level Languages) and High Performance 
+Computing (HPC) have been always two opposites ends of the spectrum: if you optimize
+programmer's time (HPP) computing time suffers (HPC) and viceversa. A synergetic 
+combination of HPC and HPP tools can bring the best of both worlds.
+
+This example however is too simplistic and don't address some important limitations
+that point to what must be done. I look forward for CPAN modules filling these gaps:
+
+=over 2
+
+=item * The former example does not address the I<load balancing problem>. The load balancing 
+problem is the problem to find the optimal work distribution among nodes, network links and
+any other involved resources, in order to get an optimal resource utilization.
+
+=item * Fault tolerance in the workers: 
+What happens if one of the worker machines is shutdown? or the connection goes down?
+What mechanisms are provided?
+
+=item * Fault tolerance in the master: 
+What if the master node goes down? Has the computation to restart from scratch?
+
+=item * Dynamic Resources: What happens if a new machine that previously was down is now available? Can we 
+added to our pool of resources?
+
+=back
 
 =head1 SEE ALSO
+
+=over 2
+
+=item * The Wikipedia entry in Cluster Computing L<http://en.wikipedia.org/wiki/Computer_cluster>
+
+=item * The Wikipedia entry in GRID Computing: L<http://en.wikipedia.org/wiki/Grid_computing>
+
+=item * The Wikipedia entry for I<Load Balancing> L<http://en.wikipedia.org/wiki/Load_balancing_%28computing%29>
+
+=item * The CPAN module L<Parallel::Iterator> by Andy Armstrong
+
+=item * The State of Parallel Computing in Perl 2007. Perlmonks node at L<http://www.perlmonks.org/?node_id=28870>
+
+=back
+
+=head1 THE FULL CODE
+
+=head2 The Driver: File C<gridpipes.pl>
+
+  $ cat  gridpipes.pl
+  #!/usr/bin/perl
+  use warnings;
+  use strict;
+  use IO::Select;
+  use GRID::Machine;
+  use Time::HiRes qw(time gettimeofday tv_interval);
+
+  my @machine = qw{beowulf orion nereida};
+  my $nummachines = @machine;
+  my %machine; # Hash of GRID::Machine objects
+  #my %debug = (beowulf => 12345, orion => 0, nereida => 0);
+  my %debug = (beowulf => 0, orion => 0, nereida => 0);
+
+  my $np = shift || $nummachines; # number of processes
+  my $lp = $np-1;
+
+  my $N = shift || 100;
+
+  my @pid;  # List of process pids
+  my @proc; # List of handles
+  my %id;   # Gives the ID for a given handle
+
+  my $cleanup = 0;
+
+  my $pi = 0;
+
+  my $readset = IO::Select->new();
+
+  my $i = 0;
+  for (@machine){
+    my $m = GRID::Machine->new(host => $_, debug => $debug{$_}, );
+
+      $m->copyandmake(
+        dir => 'pi',
+        makeargs => 'pi',
+        files => [ qw{pi.c Makefile} ],
+        cleanfiles => $cleanup,
+        cleandirs => $cleanup, # remove the whole directory at the end
+      )
+    unless $m->_x("pi/pi")->result;
+
+    die "Can't execute 'pi'\n" unless $m->_x("pi")->result;
+
+    $machine{$_} = $m;
+    last unless $i++ < $np;
+  }
+
+  my $t0 = [gettimeofday];
+  for (0..$lp) {
+    my $hn = $machine[$_ % $nummachines];
+    my $m = $machine{$hn};
+    ($proc[$_], $pid[$_]) = $m->open("./pi $_ $N $np |");
+    $readset->add($proc[$_]);
+    my $address = 0+$proc[$_];
+    $id{$address} = $_;
+  }
+
+  my @ready;
+  my $count = 0;
+  do {
+    push @ready, $readset->can_read unless @ready;
+    my $handle = shift @ready;
+
+    my $me = $id{0+$handle};
+
+    my ($partial);
+    my $numBytesRead = sysread($handle,  $partial, 1024);
+    chomp($partial);
+
+    $pi += $partial;
+    print "Process $me: machine = $machine[$me % $nummachines] partial = $partial pi = $pi\n";
+
+    $readset->remove($handle) if eof($handle);
+  } until (++$count == $np);
+
+  my $elapsed = tv_interval ($t0);
+  print "Pi = $pi. N = $N Time = $elapsed\n";
+
+=head2 The Application. File C<pi.c>
+
+  $ cat pi.c
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  main(int argc, char **argv) {
+    int id, N, np, i;
+    double sum, left;
+
+    if (argc != 4) {
+      printf("Uso:\n%s id N np\n",argv[0]);
+      exit(1);
+    }
+    id = atoi(argv[1]);
+    N = atoi(argv[2]);
+    np = atoi(argv[3]);
+    for(i=id, sum = 0; i<N; i+=np) {
+      double x = (i + 0.5)/N;
+      sum += 4 / (1 + x*x);
+    }
+    sum /= N;
+    printf("%lf\n", sum);
+  }
+
+=head2 Makefile
+
+  $ cat Makefile
+  pi:
+          cc pi.c -o pi
 
