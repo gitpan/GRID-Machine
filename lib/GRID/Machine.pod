@@ -1442,6 +1442,40 @@ When executed the program produces an output similar to this:
   -rwxr-xr-x  1 pp2 pp2 450 2007-06-27 15:20 nested5.pl
   -rwxr-xr-x  1 pp2 pp2 603 2007-05-16 14:49 nested.pl
 
+=head2 The C<copyandmake> Method
+
+Syntax:
+
+    $m->copyandmake(
+          dir => $dir,
+          files => [ @files ],      # files to transfer
+          make => $command,         # execute $command $commandargs 
+          makeargs => $commandargs, # after the transference
+          cleanfiles => $cleanup,   # remove files at the end
+          cleandirs => $cleanup,    # remove the whole directory at the end
+    )
+
+C<copyandmake> copies (using C<scp>) the files 
+C<@files> to a directory named C<$dir> in the remote machine.
+The directory C<$dir> will be created if it does not exists. After the file transfer
+the C<command> specified by the C<copyandmake> option 
+               
+                     make => 'command' 
+
+will be executed with the arguments specified in the option C<makeargs>. 
+If the C<make> option isn't specified but there is a file named C<Makefile>
+between the transferred files, the C<make> program will be executed. 
+Set the C<make> option to number 0 or the string C<''> if you want to 
+avoid the execution of any command after the transfer.
+The transferred files will be removed when the connection finishes if the
+option C<cleanfiles> is set. If the option C<cleandirs> is set,
+the 
+created directory and all the files below it will be removed. 
+Observe that the directory and the files 
+will be kept if they were'nt created by this connection.
+The call to C<copyandmake> by default sets C<dir> as the current directory in the remote
+machine. Use the option C<keepdir =E<gt> 1> to one to avoid this.
+
 
 =head1 LOADING CLASSES ONTO THE REMOTE SIDE
 
@@ -2487,7 +2521,7 @@ information.
 
 =head1 REMOTE PIPES
 
-C<GRID::Machine::IOHandle> objects can be used to pipe programs as in the following
+The C<open> method of C<GRID::Machine> objects can be used to pipe programs as in the following
 example:
 
   pp2@nereida:~/LGRID_Machine/examples$ cat -n pipes1.pl
@@ -2501,6 +2535,10 @@ example:
      8  my $f = $m->open('uname -a |');
      9  my $x = <$f>;
     10  print "UNAME result: $x\n"
+
+In a scalar context C<open> returns the handler.
+In list context returns the pair C<(handler, PID)>.
+See L<GRID::Machine::perlparintro> for a more detailed example.
 
 When executed the program produces an output similar to this:
 
@@ -2874,6 +2912,22 @@ That is a goal to fulfill.
 
 =end COMMENT
   
+=head2 Nested Uses of L<GRID::Machine>
+
+The remote server can't use L<GRID::Machine> to connect to a second
+server. I. e. a program like this fails:
+
+  use GRID::Machine;
+
+  my $host = shift || 'user@machine';
+
+  my $machine = GRID::Machine->new(host => $host, uses => [ 'GRID::Machine' ]);
+
+  my $r = $machine->eval(q{ my $t = GRID::Machine->new(host => 'orion'); });
+
+  print $r->result;
+
+
 =head2 Call by Reference
 
 Remote Subroutine Call I<by reference> is not supported in this version. 
@@ -2948,6 +3002,8 @@ exports these functions:
 =item * L<GRID::Machine>
 
 =item * L<GRID::Machine::IOHandle>
+
+=item * L<GRID::Machine::perlparintro>
 
 =item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/Machine.dvi>
 

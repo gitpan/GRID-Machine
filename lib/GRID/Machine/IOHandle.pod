@@ -135,7 +135,7 @@ If an error occurs C<blocking> will return undef and C<$!> will be set.
 
 =head1 REMOTE PIPES
 
-C<GRID::Machine::IOHandle> objects can be used to pipe programs as in the following
+The C<open> method of C<GRID::Machine> objects can be used to pipe programs as in the following
 example:
 
   pp2@nereida:~/LGRID_Machine/examples$ cat -n pipes1.pl
@@ -149,6 +149,10 @@ example:
      8  my $f = $m->open('uname -a |');
      9  my $x = <$f>;
     10  print "UNAME result: $x\n"
+
+In a scalar context C<open> returns the handler.
+In list context returns the pair C<(handler, PID)>.
+See L<GRID::Machine::perlparintro> for a more detailed example.
 
 When executed the program produces an output similar to this:
 

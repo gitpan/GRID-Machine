@@ -125,6 +125,8 @@ context the C<str> will be called.
 
 =item * L<GRID::Machine::IOHandle>
 
+=item * L<GRID::Machine::perlparintro>
+
 =item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/Machine.dvi>
 
 =item * L<IPC::PerlSSH>

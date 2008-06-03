@@ -1,7 +1,18 @@
-* sub x : public (install a synonym of the sub in the hash)
 * Document 
      - open (RIO handles) with input and output pipes
      - copyandmake
+
+* GRID::Machine::IOHandle. Open returns file globs for processes while for 
+    files we have a GRID::Machine::IOHandle object!
+
+* A GRID::Machine object can't "use GRID::Machine". This is a limitation
+     See examples/netsshtelnetgridm2.pl
+    - Quizá la parte remota debería ser también un singleton?
+
+* Optimize "scp", "sftp" open a single session and keep it open then use it to transfer files?
+
+* sub x : public (install a synonym of the sub in the hash)
+
 * Write a debugger
 
 * evalfile: read file and eval

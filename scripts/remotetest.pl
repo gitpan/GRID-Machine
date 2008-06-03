@@ -329,7 +329,7 @@ of C<GRID::Machine>:
     11  # This code will be executed in the remote servers
     12  our %preamble = (
     13    beowulf => q{ $ENV{GRID_REMOTE_MACHINE} = "orion"; },
-    14    orion   => q{ $ENV{GRID_REMOTE_MACHINE} = "beowulf.pcg.ull.es"; },
+    14    orion   => q{ $ENV{GRID_REMOTE_MACHINE} = "beowulf"; },
     15  );
 
 

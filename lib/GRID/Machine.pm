@@ -24,7 +24,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.093";
+our $VERSION = "0.094";
 
 sub read_modules {
 
