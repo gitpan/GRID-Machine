@@ -6,7 +6,7 @@
 
 package GRID::Machine;
 use strict;
-use Scalar::Util qw(blessed);
+use Scalar::Util qw(blessed reftype);
 use List::Util qw(first);
 use Module::Which;
 use IPC::Open2;
@@ -17,14 +17,21 @@ use base qw(Exporter);
 use GRID::Machine::IOHandle;
 require Cwd;
 no Cwd;
-our @EXPORT_OK = qw(is_operative read_modules qc);
+our @EXPORT_OK = qw(is_operative read_modules qc slurp_file);
 
 # We need to include the common shared perl library
 use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.094";
+our $VERSION = "0.095";
+
+####################################################################
+# Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
+# Purpose    : Concatenates the contents of the files associated with
+#              the file descriptors
+# Returns    : The string with the cotnents of all those files
+# Throws     : exception if a module can not be found
 
 sub read_modules {
 
@@ -50,8 +57,7 @@ sub read_modules {
   return $m;
 }
 
-#Warning: bug. host may be is not defined!!!!!!!!!!
-#
+# Inheritance: not considered
 { # closure for attributes
 
   my @legal = qw(
@@ -63,6 +69,7 @@ sub read_modules {
     includes
     log 
     perl
+    perloptions
     prefix 
     pushinc unshiftinc
     readfunc 
@@ -70,6 +77,7 @@ sub read_modules {
     scp 
     sendstdout
     ssh 
+    sshoptions 
     startdir startenv 
     uses
     wait 
@@ -77,19 +85,7 @@ sub read_modules {
   );
   my %legal = map { $_ => 1 } @legal;
 
-#  sub traceop {
-#    my $self = shift;
-#    if (@_) {
-#      my $traceop = shift;
-#      $self->eval('SERVER->traceop( shift() );', $traceop);
-#      $self->{traceop} = $traceop;
-#    }
-#    return $self->{traceop};
-#  }
-
   GRID::Machine::MakeAccessors::make_accessors(@legal);
-
-# push @legal, 'traceop';
 
   sub RemoteProgram {
     my ($USES,
@@ -175,6 +171,8 @@ EOREMOTE
      my $wait = $opts{wait} || 15;
      my $cleanup = $opts{cleanup};
      my $ssh = $opts{ssh} || 'ssh';
+     my $sshoptions = $opts{sshoptions} || '';
+     my $perloptions = $opts{perloptions} || '';
      my $scp = $opts{scp} || 'scp -q -p';
      my $prefix = $opts{prefix} || 'perl5lib/';
 
@@ -187,23 +185,42 @@ EOREMOTE
         if( exists $opts{command} ) {
            my $c = $opts{command};
            $host = $ENV{HOSTNAME} || "REMOTE";
-           @command = ref($c) && UNIVERSAL::isa($c, "ARRAY") ? @$c : ( "$c" );
+           @command = (reftype($c) eq "ARRAY") ? @$c : ( "$c" );
         }
         else {
            $host = $opts{host} or
               die __PACKAGE__."->new() requires a host, a command or a Readfunc/Writefunc pair";
 
+
+           my @sshoptions;
+           @sshoptions = ('-p', $1) if ($host =~ s/:(\d+$)//);
+           if (reftype($sshoptions) && (reftype($sshoptions) eq 'ARRAY')) {
+             push @sshoptions, @$sshoptions;
+           }
+           elsif ($sshoptions) {
+             push @sshoptions, split /\s+/, $sshoptions;
+           }
+
              die "Can't execute perl in $host using ssh connection with automatic authentication\n"
-           unless is_operative($ssh, $host, "perl -v", $wait);
+           unless is_operative("$ssh @sshoptions", $host, "perl -v", $wait);
+
+           my @perloptions;
+
+           if (reftype($perloptions) && (reftype($perloptions) eq 'ARRAY')) {
+             push @perloptions, @$perloptions;
+           }
+           elsif ($perloptions) {
+             push @perloptions, split /\s+/, $perloptions;
+           }
 
            if ($portdebug && $portdebug =~ /^\d+$/) {
              my $perl = qq{PERLDB_OPTS="RemotePort=$host:$portdebug" }.($opts{perl} || 'perl -d');
-             @command = ( "$ssh $host $perl" );
+             @command = ( "$ssh @sshoptions $host $perl @perloptions" );
              print "Debugging with '@command'\n".
                    "Remember to run 'netcat -v -l -p $portdebug' in $host\n\n";
            }
            else {
-             @command = ( $ssh, $host, $opts{perl} || "perl" );
+             @command = ( $ssh, @sshoptions, $host, $opts{perl} || "perl", @perloptions );
            }
         }
         
@@ -230,17 +247,14 @@ EOREMOTE
 
      my $startenv = $opts{startenv} || [];
 
-       die "Arg 'pushinc' of new must be an ARRAY ref\n" 
-     if exists($opts{pushinc}) && !UNIVERSAL::isa($opts{pushinc}, 'ARRAY');
-
      my $pushinc = $opts{pushinc} || [];
-
-       die "Arg 'unshiftinc' of new must be an ARRAY ref\n" 
-     if exists($opts{unshiftinc}) && !UNIVERSAL::isa($opts{unshiftinc}, 'ARRAY');
+     die "Arg 'pushinc' of new must be an ARRAY ref\n" unless reftype($pushinc) eq 'ARRAY';
 
      my $unshiftinc = $opts{unshiftinc} || [];
+     die "Arg 'unshiftinc' of new must be an ARRAY ref\n" unless reftype($unshiftinc) eq 'ARRAY';
 
      my $uses = $opts{uses} || [];
+     die "Arg 'uses' of new must be an ARRAY ref\n" unless reftype($uses) eq 'ARRAY';
      my $USES = '';
      $USES .= "use $_;\n" for @$uses;
 
@@ -248,7 +262,7 @@ EOREMOTE
      my $remoteprogram = RemoteProgram( # Watch the order!!!. TODO: use named parameters
          $USES,
          $REMOTE_LIBRARY,
-         $class, 
+         $class,
          $host, 
          $log, 
          $err, 
@@ -294,9 +308,9 @@ EOREMOTE
      $self->include('GRID::Machine::Core');
      $self->include('GRID::Machine::RIOHandle');
 
-     $opts{includes} = [] unless UNIVERSAL::isa($opts{includes}, 'ARRAY');
-     my @includes = @{$opts{includes}};
-     $self->include($_) for @includes;
+     my $includes = $opts{includes} || [];
+     die "Arg 'includes' of new must be an ARRAY ref\n" unless reftype($includes) eq 'ARRAY';
+     $self->include($_) for @$includes;
 
      $self->send_operation("GRID::Machine::DEBUG_LOAD_FINISHED") if $portdebug;
 
@@ -457,10 +471,16 @@ sub _slurp_perl_code {
   return $code;
 }
 
-sub _slurp_file {
+####################################################################
+# Usage      : $input = slurp_file($filename, 'trg');
+# Purpose    : opens  "$filename.trg" and sets the scalar
+# Parameters : file name and extension (not icluding the dot)
+# Comments   : Is this O.S dependent?
+
+sub slurp_file {
   my ($filename, $ext) = @_;
 
-    croak "Error in _slurp_file opening file. Provide a filename!\n" 
+    croak "Error in slurp_file opening file. Provide a filename!\n" 
   unless defined($filename) and length($filename) > 0;
   $ext = "" unless defined($ext);
   $filename .= ".$ext" unless (-r $filename) or ($filename =~ m{[.]$ext$});
@@ -490,7 +510,7 @@ sub _slurp_file {
     my $exclude = $args{exclude} || [];
     my %exclude;
 
-    if (UNIVERSAL::isa($exclude, 'ARRAY')) {
+    if (reftype($exclude) eq 'ARRAY') {
       %exclude = map { $_ => 1 } @$exclude;
     }
     elsif (defined($exclude)) {
@@ -510,7 +530,7 @@ sub _slurp_file {
         die "Can't find module $m\n";
       }
 
-      my $input = _slurp_file($file, 'pm');
+      my $input = slurp_file($file, 'pm');
 
       while ($input=~ m(
                           (?:\bsub\s+([a-zA-Z_]\w*)\s*{) # 1 False } (for vi)

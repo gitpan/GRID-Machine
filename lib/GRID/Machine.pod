@@ -306,6 +306,9 @@ The following arguments are legal:
 =item * host
 
 The host to connect. The user can be specified here.
+Also the port. I.e. it can be something like:
+
+  my $machine = GRID::Machine->new(host => 'casiano@orion:22');
 
 =item * log
 
@@ -348,6 +351,28 @@ The default value is 15 seconds.
 
 A string.  Specifies the C<ssh> command to be used. Take advantage of this if
 you want to specify some special parameters. Defaults to C<ssh>. 
+
+=item * sshoptions
+
+An C<ARRAY> ref or a string. Specifies options for the C<ssh> command.
+See an example in which is a string:
+
+
+  my $machine = GRID::Machine->new(
+                  host => $host,
+                  sshoptions => '-p 22 -l casiano',
+                  uses => [ 'Sys::Hostname' ]
+  );
+
+an another in which is an array ref:
+
+  my $machine = GRID::Machine->new(
+                  host => $host,
+                  sshoptions => [ '-l', 'casiano'],
+                  uses => [ 'Sys::Hostname' ]
+  );
+
+
 
 =item * scp
 
@@ -431,6 +456,32 @@ when executed the program produces an output similar to this:
     /etc/perl
     /usr/local/lib/perl/5.8.4
     etc. etc.
+
+=item * perloptions
+
+A string or an array ref. Contains the options to be passed to the Perl interpreter.
+See an example:
+
+  my $host = "orion:22";
+  my $machine = GRID::Machine->new(
+                  host => $host,
+                  sshoptions => '-p 22 -l casiano',
+                  perloptions => [ '-w', '-MSys::Hostname' ],
+  );
+
+Take into account that C<-MSys::Hostname> takes place at a very early stage
+of the boot process and the functions will be exported to the C<main> 
+package. Therefore a use of the function C<hostname> exported by L<Sys::Hostname>
+inside a remote C<sub> must be done as in this example:
+
+  my $r = $machine->sub(
+    rmap => q{
+      ...
+      gprint ::hostname(),": Processing @$_\n";
+      ...
+    }
+
+
 
 =item * remotelibs
 

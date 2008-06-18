@@ -20,6 +20,7 @@ t/13pipes.t
 t/Include2.pm
 t/Include.pm
 scripts/remotetest.pl
+#scripts/gmdb
 lib/GRID/Machine.pm
 lib/GRID/Machine.pod
 lib/GRID/Machine/Core.pm
@@ -143,4 +144,7 @@ examples/pipes.pl
 examples/pipes2.pl
 examples/gridpipes.pl
 examples/perldb
+examples/sshoptions2.pl
+examples/sshoptions.pl
+examples/port.pl
 META.yml                                 Module meta-data (added by MakeMaker)

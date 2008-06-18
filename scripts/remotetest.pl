@@ -3,27 +3,7 @@ use strict;
 use Scalar::Util qw{reftype};
 use File::Path;
 use Getopt::Long;
-use GRID::Machine;
-
-####################################################################
-# Usage      : $input = slurp_file($filename, 'trg');
-# Purpose    : opens  "$filename.trg" and sets the scalar
-# Parameters : file name and extension (not icluding the dot)
-# Comments   : Is this O.S dependent?
-
-sub slurp_file {
-  my ($filename, $ext) = @_;
-
-    die "Error in slurp_file opening file. Provide a filename!\n" 
-  unless defined($filename) and length($filename) > 0;
-  $ext = "" unless defined($ext);
-  $filename .= ".$ext" unless (-r $filename) or ($filename =~ m{[.]$ext$});
-  local $/ = undef;
-  open my $FILE, $filename or die "Can't open file $filename"; 
-  my $input = <$FILE>;
-  close($FILE);
-  return $input;
-}
+use GRID::Machine qw{slurp_file};
 
 # Package Variables. The user can modify it inside the machine.preamble.pl
 # configuration file
@@ -42,6 +22,24 @@ our $separator = sub {
   "************$host************\n";
 };
 
+my $m; # current machine
+my $tmpdir; # temporary directory in the remote machine
+
+our $clean_files = sub {
+  # Clean files
+  return unless UNIVERSAL::isa($m, 'GRID::Machine');
+  my $r = $m->eval( q{
+    our $tmpdir;
+    chdir "$tmpdir/.." || die "Can't chage to tmpdir/..";
+    rmtree($tmpdir);
+  });
+  warn "Can't remove files in temporary directory <$tmpdir>: $r\n" unless $r->ok;
+};
+
+local $SIG{INT} = $SIG{PIPE} = sub { 
+  $clean_files->(); 
+  die "Tests were interrupted by user!";
+};
 
 GetOptions ("localpreamble=s" => \$localpreamble);
 
@@ -65,7 +63,7 @@ if (-r $localpreamble) {
 
 for my $host (@ARGV) {
 
-  my $m = eval { 
+  $m = eval { 
     GRID::Machine->new(host => $host) 
   };
 
@@ -79,7 +77,7 @@ for my $host (@ARGV) {
   );
 
   warn($r),next unless $r->ok;
-  my $tmpdir = $r->result;
+  $tmpdir = $r->result;
 
   my $c = $preamble{$host};
   if ($c) {
@@ -124,8 +122,11 @@ for my $host (@ARGV) {
     next;
   };
 
-  if (reftype($separator) eq 'CODE') {
+  if ($separator && (reftype($separator) eq 'CODE')) {
     $separator = $separator->($m); 
+  }
+  else {
+    $separator = "\n++++++++++ $host +++++++++\n";
   }
   print $separator;
 
@@ -145,12 +146,7 @@ for my $host (@ARGV) {
   warn "Errors while running tests in $host: $r\n" unless $r->ok;
 
   # Clean files
-  $r = $m->eval( q{
-    our $tmpdir;
-    chdir "$tmpdir/.." || die "Can't chage to tmpdir/..";
-    rmtree($tmpdir);
-  });
-  warn "Can't remove files in temporary directory <$tmpdir>\n" unless $r->ok;
+  $clean_files->();
 }
 
 =head1 NAME

@@ -1,3 +1,4 @@
+* Write sig handlers for INT, HUP
 * Document 
      - open (RIO handles) with input and output pipes
      - copyandmake
@@ -13,7 +14,7 @@
 
 * sub x : public (install a synonym of the sub in the hash)
 
-* Write a debugger
+* Write a debugger. Write documentation about debugging
 
 * evalfile: read file and eval
 

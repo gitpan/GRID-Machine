@@ -281,7 +281,7 @@ sub EVAL {
      return;
   }
 
-  if ( defined($args) && !UNIVERSAL::isa($args, 'ARRAY')) {
+  if ( defined($args) && (reftype($args) ne 'ARRAY')) {
      $server->send_error( "Error in eval. Args expected. Found instead: $args" );
      return;
   }
@@ -312,7 +312,7 @@ sub STORE {
   my $politely = $args{politely} || 0; 
   delete($args{politely});
 
-  my $subref = eval qq{ sub { use strict; $code } };
+  my $subref = eval qq{ sub { use strict;0; #$name\n$code } };
   if( $@ ) {
      $server->send_error("Error while compiling $name. $@");
      return;
@@ -331,6 +331,7 @@ sub STORE {
         results => [ 1 ],
     );
   }
+  $DB::single = 1 if $server->{debug}; # warn!
   return;
 }
 
