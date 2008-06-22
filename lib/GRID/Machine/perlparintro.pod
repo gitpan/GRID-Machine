@@ -135,16 +135,51 @@ Alternatively you can write the following command:
 The C<umask> command is needed since the SSH server will refuse to 
 read a C</home/user/.ssh/authorized_keys> files which have loose permissions.
 
-=item * Edit your local C</home/.ssh/config> file and add lines like:
+=item * Edit your local configuration file C</home/user/.ssh/config> (see C<man ssh_config> 
+in UNIX) and create a new section for C<GRID::Machine> connections to that host.
+Here follows an example:
 
- Host remote.machine
+
+ ...
+
+ # A new section inside the config file: 
+ # it will be used when writing a command like: 
+ #                     $ ssh gridyum 
+
+ Host gridyum
+
+ # My username in the remote machine
  user my_login_in_the_remote_machine
 
+ # The actual name of the machine: by default the one provided in the
+ # command line
+ Hostname real.machine.name
+
+ # The port to use: by default 22
+ Port 2048
+
+ # The identitiy pair to use. By default ~/.ssh/id_rsa and ~/.ssh/id_dsa
+ IdentityFile /home/user/.ssh/yumid
+
+ # Useful to detect a broken network
+ BatchMode yes
+
+ # Useful when the home directory is shared across machines,
+ # to avoid warnings about changed host keys when connecting
+ # to local host
+ NoHostAuthenticationForLocalhost yes
+
+
+ # Another section ...
  Host another.remote.machine an.alias.for.this.machine
  user mylogin_there
 
+ ...
+
 This way you don't have to specify your I<login> name on the remote machine even if it
-differs from your  I<login> name in the local machine.
+differs from your  I<login> name in the local machine, you don't have to specify the 
+I<port> if it isn't 22, etc. This is the I<recommended> way to work with C<GRID::Machine>.
+Avoid cluttering the constructor C<new>.
 
 =item * Once the public key is installed on the server you should be able to
 authenticate using your private key
@@ -550,7 +585,7 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
 
 =head2 The Driver: File C<gridpipes.pl>
 
-  $ cat  gridpipes.pl
+  $ cat gridpipes.pl
   #!/usr/bin/perl
   use warnings;
   use strict;
@@ -573,7 +608,7 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
   my @proc; # List of handles
   my %id;   # Gives the ID for a given handle
 
-  my $cleanup = 0;
+  my $cleanup = 1;
 
   my $pi = 0;
 
@@ -583,6 +618,10 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
   for (@machine){
     my $m = GRID::Machine->new(host => $_, debug => $debug{$_}, );
 
+    if ($m->_x("pi/pi")->result) { # Already built. Don't transfer
+      $m->chdir("pi/");
+    }
+    else {
       $m->copyandmake(
         dir => 'pi',
         makeargs => 'pi',
@@ -590,7 +629,7 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
         cleanfiles => $cleanup,
         cleandirs => $cleanup, # remove the whole directory at the end
       )
-    unless $m->_x("pi/pi")->result;
+    }
 
     die "Can't execute 'pi'\n" unless $m->_x("pi")->result;
 
@@ -629,6 +668,7 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
   my $elapsed = tv_interval ($t0);
   print "Pi = $pi. N = $N Time = $elapsed\n";
 
+
 =head2 The Application. File C<pi.c>
 
   $ cat pi.c
@@ -651,6 +691,7 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
       sum += 4 / (1 + x*x);
     }
     sum /= N;
+    fflush(stdout);
     printf("%lf\n", sum);
   }
 

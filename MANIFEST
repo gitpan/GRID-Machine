@@ -147,4 +147,5 @@ examples/perldb
 examples/sshoptions2.pl
 examples/sshoptions.pl
 examples/port.pl
+examples/synopsisqc.pl
 META.yml                                 Module meta-data (added by MakeMaker)

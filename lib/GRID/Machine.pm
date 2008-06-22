@@ -24,7 +24,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.095";
+our $VERSION = "0.096";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -55,6 +55,30 @@ sub read_modules {
   }
 
   return $m;
+}
+
+#  ssh [-1246AaCfgKkMNnqsTtVvXxY] [-b bind_address] [-c cipher_spec] 
+#                         [-D  [bind_address:]port] [-e escape_char]
+#           [-F configfile] [-i identity_file] [-L  [bind_address:]port:host:hostport] 
+#           [-l login_name] [-m mac_spec]
+#           [-O ctl_cmd] [-o option] [-p port] [-R  [bind_address:]port:host:hostport] i
+#           [-S ctl_path] [-w tunnel:tunnel]
+#           [user@]hostname [command]
+#
+sub find_host {
+  my $command = shift;
+
+  my %option;
+
+  die "Error in GRID::Machine findhost. No command provided\n" unless $command;
+  $command =~ s{^(\S+)\s*}{};
+  $option{ssh} = $1;
+  while ($command =~ s{^\s*(-\w)\s+(\S*)}{}g) {
+    $option{$1} = $2;
+  }
+  $command =~ s{^\s*([\w+.\@]+)}{};
+  $option{host} = $1;
+  return \%option;
 }
 
 # Inheritance: not considered
@@ -180,12 +204,24 @@ EOREMOTE
 
      my $pid; 
 
+     my $port = 22;
+     my $identity = '';
+     my $user = '';
+     my $options;
+
      if( !defined $readfunc || !defined $writefunc ) {
         my @command;
         if( exists $opts{command} ) {
            my $c = $opts{command};
-           $host = $ENV{HOSTNAME} || "REMOTE";
-           @command = (reftype($c) eq "ARRAY") ? @$c : ( "$c" );
+           my $options = find_host($c); # $ENV{HOSTNAME} || "REMOTE";
+           $host = $options->{host};
+           $port = $options->{-p};
+           $identity = $options->{-i};
+           $user = $options->{-l};
+           $scp .= " -i $identity" if $identity;
+           $scp .= " -P $port" if $port;
+           $host = $user.'@'.$host if $user && $host !~ /\@/;
+           @command = (reftype($c) && (reftype($c) eq "ARRAY")) ? @$c : ( "$c" );
         }
         else {
            $host = $opts{host} or
@@ -193,7 +229,10 @@ EOREMOTE
 
 
            my @sshoptions;
-           @sshoptions = ('-p', $1) if ($host =~ s/:(\d+$)//);
+           if ($host =~ s/:(\d+$)//) {
+              $port = $1;
+              @sshoptions = ('-p', $port);
+           }
            if (reftype($sshoptions) && (reftype($sshoptions) eq 'ARRAY')) {
              push @sshoptions, @$sshoptions;
            }
@@ -203,6 +242,12 @@ EOREMOTE
 
              die "Can't execute perl in $host using ssh connection with automatic authentication\n"
            unless is_operative("$ssh @sshoptions", $host, "perl -v", $wait);
+
+           my %sshoptions = @sshoptions;
+
+           $scp .= " -P $sshoptions{'-p'}" if $sshoptions{-p};
+           $scp .= " -i $sshoptions{'-i'}" if $sshoptions{-i};
+           $host = $sshoptions{'-l'}.'@'.$host if $sshoptions{'-l'} && $host !~ /\@/;
 
            my @perloptions;
 
@@ -281,6 +326,8 @@ EOREMOTE
 
      my $self = {
         host       => $host,
+        port       => $port,
+        identity   => $identity,
         readfunc   => $readfunc,
         writefunc  => $writefunc,
         pid        => $pid,

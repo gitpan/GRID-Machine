@@ -140,16 +140,51 @@ Alternatively you can write the following command:
 The C<umask> command is needed since the SSH server will refuse to 
 read a C</home/user/.ssh/authorized_keys> files which have loose permissions.
 
-=item * Edit your local C</home/.ssh/config> file and add lines like:
+=item * Edit your local configuration file C</home/user/.ssh/config> (see C<man ssh_config> 
+in UNIX) and create a new section for C<GRID::Machine> connections to that host.
+Here follows an example:
 
- Host remote.machine
+
+ ...
+
+ # A new section inside the config file: 
+ # it will be used when writing a command like: 
+ #                     $ ssh gridyum 
+
+ Host gridyum
+
+ # My username in the remote machine
  user my_login_in_the_remote_machine
 
+ # The actual name of the machine: by default the one provided in the
+ # command line
+ Hostname real.machine.name
+
+ # The port to use: by default 22
+ Port 2048
+
+ # The identitiy pair to use. By default ~/.ssh/id_rsa and ~/.ssh/id_dsa
+ IdentityFile /home/user/.ssh/yumid
+
+ # Useful to detect a broken network
+ BatchMode yes
+
+ # Useful when the home directory is shared across machines,
+ # to avoid warnings about changed host keys when connecting
+ # to local host
+ NoHostAuthenticationForLocalhost yes
+
+
+ # Another section ...
  Host another.remote.machine an.alias.for.this.machine
  user mylogin_there
 
+ ...
+
 This way you don't have to specify your I<login> name on the remote machine even if it
-differs from your  I<login> name in the local machine.
+differs from your  I<login> name in the local machine, you don't have to specify the 
+I<port> if it isn't 22, etc. This is the I<recommended> way to work with C<GRID::Machine>.
+Avoid cluttering the constructor C<new>.
 
 =item * Once the public key is installed on the server you should be able to
 authenticate using your private key
@@ -308,7 +343,42 @@ The following arguments are legal:
 The host to connect. The user can be specified here.
 Also the port. I.e. it can be something like:
 
-  my $machine = GRID::Machine->new(host => 'casiano@orion:22');
+  my $machine = GRID::Machine->new(host => 'casiano@orion:2048');
+
+However, instead of specifying the user, port and other C<ssh> parameters here,
+the recommended way to work was explained in section 
+L<INSTALLATION>: insert a section inside the C</home/user/.ssh/config>
+file:
+
+ ...
+
+ # A new section inside the config file: 
+ # it will be used when writing a command like: 
+ #                     $ ssh gridyum 
+
+ Host orion
+
+ # My username in the remote machine
+ user casiano
+
+ # The actual name of the machine: by default the one provided in the
+ # command line
+ Hostname orion.at.some.domain
+
+ # The port to use: by default 22
+ Port 2048
+
+ # The identitiy pair to use. By default ~/.ssh/id_rsa and ~/.ssh/id_dsa
+ IdentityFile /home/user/.ssh/orionid
+
+ # Useful to detect a broken network
+ BatchMode yes
+
+ # Useful when the home directory is shared across machines,
+ # to avoid warnings about changed host keys when connecting
+ # to local host
+ NoHostAuthenticationForLocalhost yes
+
 
 =item * log
 
@@ -864,7 +934,7 @@ Now the execution of the program produces the following output:
   Global symbol "$q" requires explicit package name at ./syntaxerr5.pl line 12, \
   <STDIN> line 194.
 
-=head3 Scope and Visbility Issues
+=head3 Scope and Visibility Issues
 
 Since the C<eval> method wraps the code into a subroutine 
 (see section L<The Algorithm of eval>) like this

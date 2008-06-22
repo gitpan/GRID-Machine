@@ -30,6 +30,10 @@ my $i = 0;
 for (@machine){
   my $m = GRID::Machine->new(host => $_, debug => $debug{$_}, );
 
+  if ($m->_x("pi/pi")->result) {
+    $m->chdir("pi/");
+  } 
+  else { 
     $m->copyandmake(
       dir => 'pi', 
       makeargs => 'pi', 
@@ -37,7 +41,7 @@ for (@machine){
       cleanfiles => $cleanup,
       cleandirs => $cleanup, # remove the whole directory at the end
     )
-  unless $m->_x("pi/pi")->result; 
+  }
 
   die "Can't execute 'pi'\n" unless $m->_x("pi")->result;
 
