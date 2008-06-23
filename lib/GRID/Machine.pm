@@ -9,7 +9,8 @@ use strict;
 use Scalar::Util qw(blessed reftype);
 use List::Util qw(first);
 use Module::Which;
-use IPC::Open2;
+use IPC::Open2();
+use IPC::Open3();
 use Carp;
 use File::Spec;
 use IO::File;
@@ -24,7 +25,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.096";
+our $VERSION = "0.097";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -71,7 +72,7 @@ sub find_host {
   my %option;
 
   die "Error in GRID::Machine findhost. No command provided\n" unless $command;
-  $command =~ s{^(\S+)\s*}{};
+  $command =~ s{^\s*(\S+)\s*}{};
   $option{ssh} = $1;
   while ($command =~ s{^\s*(-\w)\s+(\S*)}{}g) {
     $option{$1} = $2;
@@ -101,6 +102,7 @@ sub find_host {
     scp 
     sendstdout
     ssh 
+    sshpipe 
     sshoptions 
     startdir startenv 
     uses
@@ -198,6 +200,7 @@ EOREMOTE
      my $sshoptions = $opts{sshoptions} || '';
      my $perloptions = $opts{perloptions} || '';
      my $scp = $opts{scp} || 'scp -q -p';
+     my $sshpipe = $ssh;
      my $prefix = $opts{prefix} || 'perl5lib/';
 
      $cleanup = 1 unless defined($cleanup);
@@ -213,15 +216,25 @@ EOREMOTE
         my @command;
         if( exists $opts{command} ) {
            my $c = $opts{command};
-           my $options = find_host($c); # $ENV{HOSTNAME} || "REMOTE";
+           $c = "@$c" if (reftype($c) && (reftype($c) eq "ARRAY"));
+
+           my $options = find_host($c); 
            $host = $options->{host};
            $port = $options->{-p};
            $identity = $options->{-i};
            $user = $options->{-l};
-           $scp .= " -i $identity" if $identity;
-           $scp .= " -P $port" if $port;
+           if ($identity) {
+             $scp .= " -i $identity";
+             $sshpipe .= " -i $identity";
+           }
+           if ($port) {
+             $scp .= " -P $port";
+             $sshpipe .= " -p $port";
+           }
            $host = $user.'@'.$host if $user && $host !~ /\@/;
-           @command = (reftype($c) && (reftype($c) eq "ARRAY")) ? @$c : ( "$c" );
+           #$c .= ' perl' unless $c =~ /perl/;
+
+           @command = ( $c );
         }
         else {
            $host = $opts{host} or
@@ -240,13 +253,19 @@ EOREMOTE
              push @sshoptions, split /\s+/, $sshoptions;
            }
 
-             die "Can't execute perl in $host using ssh connection with automatic authentication\n"
-           unless is_operative("$ssh @sshoptions", $host, "perl -v", $wait);
+           #  die "Can't execute perl in $host using ssh connection with automatic authentication\n"
+           #unless is_operative("$ssh @sshoptions", $host, "perl -v", $wait);
 
            my %sshoptions = @sshoptions;
 
-           $scp .= " -P $sshoptions{'-p'}" if $sshoptions{-p};
-           $scp .= " -i $sshoptions{'-i'}" if $sshoptions{-i};
+           if ($sshoptions{-p}) {
+             $scp .= " -P $sshoptions{'-p'}";
+             $sshpipe .= " -p $sshoptions{'-p'}";
+           }
+           if ($sshoptions{-i}) {
+             $scp .= " -i $sshoptions{'-i'}";
+             $sshpipe .= " -i $sshoptions{'-i'}";
+           }
            $host = $sshoptions{'-l'}.'@'.$host if $sshoptions{'-l'} && $host !~ /\@/;
 
            my @perloptions;
@@ -270,7 +289,10 @@ EOREMOTE
         }
         
         my ( $readpipe, $writepipe );
-        $pid = open2( $readpipe, $writepipe, @command );
+        eval {
+          $pid = IPC::Open2::open2( $readpipe, $writepipe, @command );
+        };
+        die "Can't execute perl in $host using ssh connection with automatic authentication: $@\n" if $@;
 
         $readfunc = sub {
            if( defined $_[1] ) {
@@ -333,6 +355,7 @@ EOREMOTE
         pid        => $pid,
         sendstdout => $sendstdout,
         ssh        => $ssh,
+        sshpipe    => $sshpipe,
         scp        => $scp,
         wait       => $wait,
         prefix     => $prefix,
@@ -891,14 +914,14 @@ sub copyandmake {
 
 # Add a SIGPIPE handler
 sub openpipe {
-  my $machine = shift;
+  my $self = shift;
   my $exec = shift;
   my $mode = shift;
 
-  my $host = $machine->host;
-  my $ssh = $machine->ssh;
+  my $host = $self->host;
+  my $ssh = $self->sshpipe;
 
-  my $r = $machine->wrapexec($exec);
+  my $r = $self->wrapexec($exec);
   die $r unless $r->ok;
 
   my $scriptname = $r->result;
@@ -927,6 +950,53 @@ sub open {
   my $index = $self->_get_result()->result;
 
   return bless { index => $index, server => $self }, 'GRID::Machine::IOHandle';
+}
+
+sub open2 {
+  my ($self, $from_child, $to_child, $command) = splice @_, 0, 4;
+    die "GRID::Machine::open2 error: wrong arguments\n" 
+  unless defined($command) && UNIVERSAL::isa($self, 'GRID::Machine');
+
+  my $host = $self->host;
+  my $ssh = $self->sshpipe;
+
+  $command = "@$command" if reftype($command) && (reftype($command) eq 'ARRAY');
+  my $r = $self->wrapexec($command);
+  die $r unless $r->ok;
+
+  my $scriptname = $r->result;
+
+  my $c = "$ssh $host perl $scriptname";
+  #($from_child, $to_child) = (IO::File->new, IO::File->new);
+  my $pid = IPC::Open2::open2($from_child, $to_child, $c) || die "Can't open2 <$c>\n";
+
+  @_[1..2] = ($from_child, $to_child);
+
+  return $pid;
+}
+
+sub open3 {
+  my ($self, $to_child, $from_child, $err_child, $command) = @_;
+
+    die "GRID::Machine::open3 error: wrong arguments\n" 
+  unless defined($command) && UNIVERSAL::isa($self, 'GRID::Machine');
+
+  my $host = $self->host;
+  my $ssh = $self->sshpipe;
+
+  $command = "@$command" if reftype($command) && (reftype($command) eq 'ARRAY');
+  my $r = $self->wrapexec($command);
+  die $r unless $r->ok;
+
+  my $scriptname = $r->result;
+
+  my $c = "$ssh $host perl $scriptname";
+  #($from_child, $to_child) = (IO::File->new, IO::File->new);
+  my $pid = IPC::Open3::open3($to_child, $from_child, $err_child, $c) || die "Can't open3 <$c>\n";
+
+  @_[1..3] = ($to_child, $from_child, $err_child);
+
+  return $pid;
 }
 
 sub DESTROY {

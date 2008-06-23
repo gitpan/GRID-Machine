@@ -45,16 +45,17 @@ sub wrapexec {
   my ($name) = $execname =~ m{([\w.]+)$};
   $name ||= '';
 
-  my $ENV = '"'.(join '","', %ENV).'"';
+  my $ENV = "'".(join "',\n  '", %ENV)."'";
 
   my $filename = "gridmachine_driver_${name}";
   my $tmp = File::Temp->new( TEMPLATE => $filename.'XXXXX', DIR => '/tmp', UNLINK => 0);
   my $scriptname = $tmp->filename;
 
   print $tmp <<"EOF";
-chdir "$dir" || die "Can't change to dir $dir\\\n";
+chdir "$dir" || die "Can't change to dir $dir\\n";
 \%ENV = ($ENV);
-exec("$exec") or die "Can't execute $exec\\\n";
+\$| = 1;
+exec("$exec") or die "Can't execute $exec\\n";
 EOF
 
    push @{SERVER->cleanfiles}, $scriptname;

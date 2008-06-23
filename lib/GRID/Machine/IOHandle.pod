@@ -135,6 +135,8 @@ If an error occurs C<blocking> will return undef and C<$!> will be set.
 
 =head1 REMOTE PIPES
 
+=head2 Opening pipes for input
+
 The C<open> method of C<GRID::Machine> objects can be used to pipe programs as in the following
 example:
 
@@ -158,6 +160,8 @@ When executed the program produces an output similar to this:
 
   pp2@nereida:~/LGRID_Machine/examples$ pipes1.pl
   UNAME result: Linux remote 2.6.8-2-686 #1 Tue Aug 16 13:22:48 UTC 2005 i686 GNU/Linux
+
+=head2 Opening pipes for output
 
 Pipes can be also for input as the following example shows:
 
@@ -202,6 +206,64 @@ former example
 be sure to redirect the C<STDOUT> of the program. 
 Otherwise, C<GRID::Machine> will redirect it to the
 C<null> device and the output will be lost.
+
+=head2 Bidirectional pipes: C<open2> 
+
+Synopsis:
+
+
+  my $WTR = IO::Handle->new();
+  my $RDR = IO::Handle->new();
+  my $pid = $m->open2($fromchild, $tochild, 'command and args');
+
+The C<open2> method runs the given command in machine C<$m>
+and connects C<$fromchild> for
+reading from C<command> and C<$tochild> 
+for writing from C<command>.
+Returns the PID of the process executing C<command>.
+
+=head2 Bidirectional pipes: C<open3>
+
+Synopsis:
+
+  my $pid = $m->open3($tochild, $fromchild, $errfromchild, 'command and args');
+
+Spawns the given command and connects C<$fromchild> for reading from the child,
+C<$tochild> for writing to the child, and C<$errfromchild> for errors.  
+
+See an example that opens the Unix calculator C<bc> in a remote machine:
+
+  $ cat -n open3bc.pl
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4
+     5  my $machine = shift || 'orion.pcg.ull.es';
+     6  my $m = GRID::Machine->new( host => $machine );
+     7
+     8  my $WTR = IO::Handle->new();
+     9  my $RDR = IO::Handle->new();
+    10  my $ERR = IO::Handle->new();
+    11  my $pid = $m->open3($WTR, $RDR, $ERR, 'bc');
+    12
+    13  my $line;
+    14
+    15  print $WTR "3*2\n";
+    16  $line = <$RDR>;
+    17  print STDOUT "3*2 = $line";
+    18
+    19  print $WTR "3/(2-2)\n";
+    20  $line = <$ERR>;
+    21  print STDOUT "3/(2-2) produces error = $line\n";
+    22
+    23  print $WTR "quit\n";
+    24  wait;
+
+When executed, the former program produces an output like this:
+
+  $ open3bc.pl
+  3*2 = 6
+  3/(2-2) produces error = Runtime error (func=(main), adr=11): Divide by zero
 
 
 
