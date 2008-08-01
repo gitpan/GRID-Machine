@@ -36,6 +36,7 @@ lib/GRID/Machine/Message.pod
 lib/GRID/Machine/REMOTE.pod
 lib/GRID/Machine/Result.pod
 lib/GRID/Machine/perlparintro.pod
+lib/GRID/Machine/remotedebugtut.pod
 examples/2machines.pl
 examples/accessobject.pl
 examples/alias.pl

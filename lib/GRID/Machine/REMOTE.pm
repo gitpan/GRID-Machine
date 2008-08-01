@@ -331,7 +331,7 @@ sub STORE {
         results => [ 1 ],
     );
   }
-  $DB::single = 1 if $server->{debug}; # warn!
+  #$DB::single = 1 if $server->{debug}; # warn!
   return;
 }
 
@@ -437,7 +437,8 @@ sub MODPUT {
     my $dir = File::Spec->catfile($self->prefix, @a);
 
     if (defined($dir)) {
-      mkdir($dir) unless -e $dir;
+      # Bug fixed by Alex White. Thanks Alex!
+      mkpath($dir) unless -e $dir;
     
       chdir($dir) or $self->send_error("Error chdir $dir $@"), return; 
     }

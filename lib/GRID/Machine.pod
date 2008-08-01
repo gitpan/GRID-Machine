@@ -3190,6 +3190,10 @@ exports these functions:
 
 =item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/Machine.dvi>
 
+=item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/perlparintro.dvi>
+
+=item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/remotedebugtut.dvi>
+
 =item * L<IPC::PerlSSH>
 
 =item * Man pages of C<ssh>, C<ssh-key-gen>, C<ssh_config>, C<scp>, 
@@ -3212,6 +3216,8 @@ for callbacks. Many thanks Dmitry.
 problem with C<is_operative> hanging on systems that are in an
 odd state. 
 
+=item * Alex White fixed a bug in C<modput>
+
 =back
 
 
@@ -3230,7 +3236,8 @@ The University of La Laguna has also supported my work in many ways
 and for many years.
 
 I wish to thank Paul Evans for his C<IPC::PerlSSH> module: it was the source
-of inspiration for this module. To Dmitri Kargapolov for his contributions.
+of inspiration for this module. To Dmitri Kargapolov, Eric Busto and
+Alex White for their contributions.
 To the perl monks, and the Perl Community for generously sharing their knowledge.
 Finally, thanks to Juana, Coro and  my students at La Laguna.
 

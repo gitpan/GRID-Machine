@@ -1,3 +1,4 @@
+* Overload bool so that gives the result component idem + and others
 * Write sig handlers for INT, HUP
 * Document 
      - open (RIO handles) with input and output pipes

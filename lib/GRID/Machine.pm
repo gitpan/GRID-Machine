@@ -25,7 +25,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.097";
+our $VERSION = "0.098";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -278,10 +278,14 @@ EOREMOTE
            }
 
            if ($portdebug && $portdebug =~ /^\d+$/) {
-             my $perl = qq{PERLDB_OPTS="RemotePort=$host:$portdebug" }.($opts{perl} || 'perl -d');
+             #my $purehost = $host;
+             #$purehost =~ s/^[\w.]*\@//;
+             #my $perl = qq{PERLDB_OPTS="RemotePort=$purehost:$portdebug" }.($opts{perl} || 'perl -d');
+             my $perl = qq{PERLDB_OPTS="RemotePort=localhost:$portdebug" }.($opts{perl} || 'perl -d');
              @command = ( "$ssh @sshoptions $host $perl @perloptions" );
              print "Debugging with '@command'\n".
-                   "Remember to run 'netcat -v -l -p $portdebug' in $host\n\n";
+                   "Remember to run in $host: 'netcat -v -l -p $portdebug'\n".
+                   "or 'socat -d READLINE,history=\$HOME/.perldbhistory TCP4-LISTEN:$portdebug,reuseaddr'\n\n";
            }
            else {
              @command = ( $ssh, @sshoptions, $host, $opts{perl} || "perl", @perloptions );

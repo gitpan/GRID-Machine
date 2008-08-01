@@ -258,7 +258,8 @@ The University of La Laguna has also supported my work in many ways
 and for many years.
 
 I wish to thank Paul Evans for his C<IPC::PerlSSH> module: it was the source
-of inspiration for this module. To Dmitri Kargapolov for his contributions.
+of inspiration for this module. To Dmitri Kargapolov, Eric Busto and
+Alex White for their contributions.
 To the perl monks, and the Perl Community for generously sharing their knowledge.
 Finally, thanks to Juana, Coro and  my students at La Laguna.
 

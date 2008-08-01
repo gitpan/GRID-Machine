@@ -511,6 +511,59 @@ if I use the three machines:
 which gives a speed factor of C<32/13.7 = 2.3> or not considering
 the set-up time C<32/10.9 = 2.9>.
 
+What happens if you have multiprocessor machine. The results highly
+depend on the underlying architecture. My machine C<nereida> is a dual Xeon: 
+
+  nereida:/tmp/graphviz-2.20.2# cat /proc/cpuinfo
+  processor       : 0
+  vendor_id       : GenuineIntel
+  cpu family      : 15
+  model           : 2
+  model name      : Intel(R) Xeon(TM) CPU 2.66GHz
+  stepping        : 5
+  cpu MHz         : 2658.041
+  cache size      : 512 KB
+  physical id     : 0
+  .......................................
+
+  processor       : 1
+  vendor_id       : GenuineIntel
+  cpu family      : 15
+  model           : 2
+  model name      : Intel(R) Xeon(TM) CPU 2.66GHz
+  stepping        : 5
+  cpu MHz         : 2658.041
+  cache size      : 512 KB
+  physical id     : 0
+  ...................................
+
+After changing the C<Makefile> to include the C<-O3> option and the
+line defining the set of machines in C<gridpipes.pl>
+(addresses in the subnetwork 127.0.0 are mapped to localhost):
+
+  my @machine = qw{127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4};
+
+We have the following results:
+
+  pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 1 1000000000
+  Process 0: machine = 127.0.0.1 partial = 3.141593 pi = 3.141593
+  Pi = 3.141593. N = 1000000000 Time = 32.968117
+
+  real    0m33.858s
+  user    0m0.336s
+  sys     0m0.128s
+
+  pp2@nereida:~/LGRID_Machine/examples$ time gridpipes.pl 2 1000000000
+  Process 1: machine = 127.0.0.2 partial = 1.570796 pi = 1.570796
+  Process 0: machine = 127.0.0.1 partial = 1.570796 pi = 3.141592
+  Pi = 3.141592. N = 1000000000 Time = 16.552487
+
+  real    0m18.076s
+  user    0m0.504s
+  sys     0m0.188s
+
+Which gives an speed up near 2.
+
 =head1 CONCLUSIONS, LIMITATIONS AND FUTURE WORK
 
 This example shows how to 
@@ -554,6 +607,10 @@ add it to our pool of resources?
 =item * L<GRID::Machine::perlparintro>
 
 =item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/Machine.dvi>
+
+=item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/perlparintro.dvi>
+
+=item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/remotedebugtut.dvi>
 
 =item * L<IPC::PerlSSH>
 
