@@ -568,6 +568,7 @@ sub main() {
 sub DEBUG_LOAD_FINISHED {
   my $self = shift;
 
+  no warnings 'once';
   $DB::single = 1 if $self->{debug};
 }
 
