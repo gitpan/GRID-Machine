@@ -122,7 +122,7 @@ for my $host (@ARGV) {
     next;
   };
 
-  if ($separator && (reftype($separator) eq 'CODE')) {
+  if (reftype($separator) && (reftype($separator) eq 'CODE')) {
     $separator = $separator->($m); 
   }
   else {

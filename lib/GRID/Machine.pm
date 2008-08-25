@@ -25,7 +25,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.099";
+our $VERSION = "0.100";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);

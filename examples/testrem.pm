@@ -1,7 +1,7 @@
 
 use strict;
 
-package Alpha;
+package Alpha::Beta::Gamma;
 
 sub Test {
     print "this is testrem\n";

@@ -16,7 +16,7 @@ for my $host qw( orion beowulf ) {
     # register remote procedure
     my $r = $machine->sub( remote => q{
         print 'remote proc host: ' . &hostname . "\n";
-        Alpha::Test()
+        Alpha::Beta::Gamma::Test()
     } );
     die $r->errmsg unless $r->ok;
 
