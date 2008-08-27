@@ -3210,13 +3210,15 @@ C<ssh-agent>, C<ssh-add>, C<sshd>
 
 =item * Dmitriy Kargapolov (<dmitriy.kargapolov@gmail.com>)
 suggested, designed and provided an implementation 
-for callbacks. Many thanks Dmitry.
+for callbacks. 
 
 =item * Eric Busto fixed a 
 problem with C<is_operative> hanging on systems that are in an
 odd state. 
 
-=item * Alex White fixed a bug in C<modput>
+=item * Alex White fixed a bug in C<modput>.
+
+=item * Erik Welch fixed a bug in the (local) C<DESTROY> method.
 
 =back
 

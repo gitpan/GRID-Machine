@@ -25,7 +25,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.100";
+our $VERSION = "0.101";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -1005,6 +1005,7 @@ sub open3 {
 
 sub DESTROY {
    my $self = shift;
+   local $?;
 
    $self->send_operation( "GRID::Machine::QUIT" );
 
