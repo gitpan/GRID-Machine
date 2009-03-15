@@ -1,6 +1,5 @@
 Changes
 Makefile.PL
-setperl5lib
 MANIFEST
 README
 TODO
@@ -17,6 +16,7 @@ t/10manyevals.t
 t/11tworemoteinputs.t
 t/12pipes.t
 t/13pipes.t
+t/14open2.t
 t/Include2.pm
 t/Include.pm
 scripts/remotetest.pl
@@ -71,6 +71,13 @@ examples/includewithuseanderror.pl
 examples/includewithuse.pl
 examples/installed.pl
 examples/mkdir.pl
+examples/matrixproduct/open/MachineConfig.pm
+examples/matrixproduct/open/Makefile
+examples/matrixproduct/open/matrix.c
+examples/matrixproduct/open/matrix_grid.pl
+examples/matrixproduct/open/OnlyEuropa.pm
+examples/matrixproduct/open/data/A100x100.dat
+examples/matrixproduct/open/data/B100x100.dat
 examples/modput.pl
 examples/nested2.pl
 examples/nested3.pl
@@ -144,7 +151,6 @@ examples/pipes1.pl
 examples/pipes.pl
 examples/pipes2.pl
 examples/gridpipes.pl
-examples/perldb
 examples/sshoptions2.pl
 examples/sshoptions.pl
 examples/port.pl

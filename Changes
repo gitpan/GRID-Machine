@@ -1,4 +1,5 @@
-Revision history for Perl extension GRID::Machine.
+2504 Usamos stat para comprobar si hay necesidad de reactualizar
+    * Cuando una máquina es multiprocesador solo enviar las matrices una vez
 
 0.01  Wed May 16 13:12:17 2007
 	- original version; created by h2xs 1.23 with options

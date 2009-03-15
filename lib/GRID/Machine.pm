@@ -16,6 +16,8 @@ use File::Spec;
 use IO::File;
 use base qw(Exporter);
 use GRID::Machine::IOHandle;
+require POSIX;
+
 require Cwd;
 no Cwd;
 our @EXPORT_OK = qw(is_operative read_modules qc slurp_file);
@@ -25,13 +27,13 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.101";
+our $VERSION = "0.102";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
 # Purpose    : Concatenates the contents of the files associated with
 #              the file descriptors
-# Returns    : The string with the cotnents of all those files
+# Returns    : The string with the contents of all those files
 # Throws     : exception if a module can not be found
 
 sub read_modules {
@@ -363,6 +365,7 @@ EOREMOTE
         scp        => $scp,
         wait       => $wait,
         prefix     => $prefix,
+        PROCESSPIDS => [],
      };
 
      my $machineclass = "$class"."::".(0+$self);
@@ -916,6 +919,57 @@ sub copyandmake {
   $m->chdir($olddir) if $keepdir;
 }
 
+sub copytarmake {
+  my $m = shift;
+  my %arg = @_;
+
+  my $dir = $arg{dir} || die "copytarmake error: Provide a directory\n";
+  my $file = $arg{file} || die "copytarmake error: Provide a tar file\n";
+  die "copytarmake error: file $file does not follow standard name convention\n" unless $file =~ m{([\w.-]+)\.tar(\.gz)?$};
+
+  my $make = $arg{make} || 'make';
+  my $makeargs = $arg{makeargs} || '';
+
+  # Shall I change dir at the end?
+  my $keepdir = $arg{keepdir} || 0;
+
+  my $olddir = $m->getcwd()->result;
+
+  my $host = $m->host;
+
+  # Create if it does not exists?
+  $m->chdir($dir);
+
+  $m->put([$file]) or die "Can't copy distribution to $host\n";
+
+  my $r = $m->eval(q{
+      my $dist = shift;
+
+      eval('use Archive::Tar');
+      if (Archive::Tar->can('new')) {
+        # Archive::Tar is installed, use it
+        my $tar = Archive::Tar->new;
+        $tar->read($dist, 1) or die "Archive::Tar error: Can't read distribution $dist\n";
+        $tar->extract() or die "Archive::Tar error: Can't extract distribution $dist\n";
+      }
+      else {
+        system('gunzip', $dist) and die "Can't gunzip $dist\n";
+        my $tar = $dist =~ s/\.gz$//;
+        system('tar', '-xf', $tar) or die "Can't untar $tar\n";
+      }
+    },
+    $file # arg for eval
+  );
+
+  die "$r" unless $r->ok;
+
+  $r = $m->system("$make $makeargs");
+
+  die "$r" unless $r->ok;
+
+  $m->chdir($olddir) if $keepdir;
+}
+
 # Add a SIGPIPE handler
 sub openpipe {
   my $self = shift;
@@ -935,6 +989,8 @@ sub openpipe {
 
   my $proc = IO::File->new;
   my $pid = open($proc, $command) || die "Can't open <$ssh $host perl $scriptname>\n";
+
+  push @{$self->{PROCESSPIDS}}, $pid;
 
   return (wantarray ? ($proc, $pid) : $proc);
 }
@@ -974,6 +1030,8 @@ sub open2 {
   #($from_child, $to_child) = (IO::File->new, IO::File->new);
   my $pid = IPC::Open2::open2($from_child, $to_child, $c) || die "Can't open2 <$c>\n";
 
+  push @{$self->{PROCESSPIDS}}, $pid;
+
   @_[1..2] = ($from_child, $to_child);
 
   return $pid;
@@ -997,6 +1055,8 @@ sub open3 {
   my $c = "$ssh $host perl $scriptname";
   #($from_child, $to_child) = (IO::File->new, IO::File->new);
   my $pid = IPC::Open3::open3($to_child, $from_child, $err_child, $c) || die "Can't open3 <$c>\n";
+
+  push @{$self->{PROCESSPIDS}}, $pid;
 
   @_[1..3] = ($to_child, $from_child, $err_child);
 

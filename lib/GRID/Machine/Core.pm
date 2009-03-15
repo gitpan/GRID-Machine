@@ -55,10 +55,11 @@ sub wrapexec {
 chdir "$dir" || die "Can't change to dir $dir\\n";
 \%ENV = ($ENV);
 \$| = 1;
-exec("$exec") or die "Can't execute $exec\\n";
+system("$exec") and die "GRID::Machine::Core::wrapexec error. Can't execute $exec\\n";
+unlink('$scriptname');
 EOF
 
-   push @{SERVER->cleanfiles}, $scriptname;
+   #push @{SERVER->cleanfiles}, $scriptname; # unless shift();
    close($tmp);
    return $scriptname;
 }
@@ -134,6 +135,13 @@ sub installed {
   my $module = shift;
 
   !CORE::system("$^X -M$module -e 0");
+}
+
+sub _stat {
+  my $filehandle = shift;
+ 
+  return stat($filehandle) if defined($filehandle);
+  return stat();
 }
 
 LOCAL {

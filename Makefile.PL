@@ -43,6 +43,7 @@ sub MY::postamble {
 	);
 
 return <<"EOT";
+
 doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
 	cd tt2; tpage  Machine.tt2 > ../lib/GRID/Machine.pod
 	cd tt2; tpage  Message.tt2 > ../lib/GRID/Machine/Message.pod
@@ -101,6 +102,12 @@ publish: doc html xdvi
 
 remotetest:
 	scripts/remotetest.pl \${DISTVNAME}.tar.gz @machines
+
+.PHONY: tags
+tags:
+	/usr/share/vim/vim71/tools/pltags.pl lib/GRID/Machine/*.pm lib/GRID/Machine.pm
+	ctags -a --exclude=examples --exclude=t --exclude=doc --exclude=tt2
+
 EOT
 }
 

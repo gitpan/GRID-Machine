@@ -1,3 +1,24 @@
+* cleanfiles option: bug. Esta borrando los scripts antes de tiempo
+   Añadir array de PIDs al estado del objeto GRID:::Machine. 
+   En open, open2, open3 y cualesquiera cosas por el estilo hay
+   que hacer 
+                     push @{$self->{pid}}, $pid
+
+   y luego en el DESTROY sincronizarse con esos procesos.
+   Pero la cosa es compleja. ¿que pasa si esos procesos son matados o
+   fallan? ¿Debemos hacer (waitpid(-1, POSIX::WNOHANG()) > 0)?
+
+   Otra posibilidad es que la supresión de scripts generados se haga
+   en el DESTROY bajo peticiones del maestro. Para cada PID en PROCESSPIDS
+   se comprueba que el script existe y se manda a suprimir.
+
+* factorizar e ir construyendo el módulo GRID::Farm
+* bugs ?
+  * copyandmake: directorios con el open, que pasa si se usan rutas. Estudiar
+  
+* Poner el maestro a trabajar: modificar GRID::Machine para que provea un modo "local"
+de conexion virtual ssh
+
 * Overload bool so that gives the result component idem + and others
 * Write sig handlers for INT, HUP
 * Document 

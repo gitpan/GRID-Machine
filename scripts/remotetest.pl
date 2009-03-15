@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 use strict;
 use Scalar::Util qw{reftype};
 use File::Path;
@@ -38,7 +38,7 @@ our $clean_files = sub {
 
 local $SIG{INT} = $SIG{PIPE} = sub { 
   $clean_files->(); 
-  die "Tests were interrupted by user!";
+  warn "Tests were interrupted by user!";
 };
 
 GetOptions ("localpreamble=s" => \$localpreamble);
@@ -107,9 +107,9 @@ for my $host (@ARGV) {
         $tar->extract() or die "Archive::Tar error: Can't extract distribution $dist\n";
       }
       else {
-        system('gunzip', $dist) or die "Can't gunzip $dist\n";
+        system('gunzip', $dist) and die "Can't gunzip $dist\n";
         my $tar = $dist =~ s/\.gz$//;
-        system('tar', '-xf', $tar) or die "Can't untar $tar\n";
+        system('tar', '-xf', $tar) and die "Can't untar $tar\n";
       }
     },
     $dist # arg for eval
@@ -138,8 +138,13 @@ for my $host (@ARGV) {
     })->Results;
   }
 
-  next unless $m->run("perl $makebuilder $makebuilder_arg");
-  next unless $m->run("$build $build_arg");
+  $r = $m-> system("perl $makebuilder $makebuilder_arg");
+  print "$r";
+  next if $r->stderr;
+
+  $r = $m->system("$build $build_arg");
+  print "$r";
+  next if $r->stderr; 
 
   $r = $m->system("$build test $build_test_arg");
   print $r;
