@@ -5,14 +5,16 @@ use IO::Select;
 use GRID::Machine;
 use Time::HiRes qw(time gettimeofday tv_interval);
 
-#my @machine = qw{nereida beowulf orion};
+#my @machine = qw{europa};
+my @machine = qw{europa beowulf orion};
 #my @machine = qw{nereida nereida nereida nereida};
-my @machine = qw{127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4};
+#my @machine = qw{127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4};
 #my @machine = qw{beo chum};
 my $nummachines = @machine;
 my %machine; # Hash of GRID::Machine objects
 #my %debug = (beowulf => 12345, orion => 0, nereida => 0);
-my %debug = (beowulf => 0, orion => 0, nereida => 0);
+#my %debug = (europa => 12344, beowulf => 0, orion => 0, nereida => 0);
+my %debug = (europa => 0, beowulf => 0, orion => 0, nereida => 0);
 
 my $np = shift || $nummachines; # number of processes
 my $lp = $np-1;
@@ -23,7 +25,7 @@ my @pid;  # List of process pids
 my @proc; # List of handles
 my %id;   # Gives the ID for a given handle
 
-my $cleanup = 1;
+my $cleanup = 0;
 
 my $pi = 0;
 

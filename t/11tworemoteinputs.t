@@ -1,12 +1,12 @@
 #!/usr/local/bin/perl -w
 use strict;
-use Test::More tests => 5;
+use Test::More tests => 6;
 BEGIN { use_ok('GRID::Machine', 'is_operative') };
 
 my $host = $ENV{GRID_REMOTE_MACHINE};
 
 SKIP: {
-    skip "Remote not operative", 4 unless $host and is_operative('ssh', $host);
+    skip "Remote not operative", 5 unless $host and is_operative('ssh', $host);
 
     my $m = GRID::Machine->new( host => $host );
 
@@ -35,6 +35,9 @@ SKIP: {
     $old = $m->input_record_separator($old);
     like($x,qr{Hola Mundo!.*Bona Sera Signorina}s, "undef input_record_separator");
 
+    my $r = $m->unlink('tutu.txt');
+
+    ok($r->ok,'Remote file removed');
 
 } # end SKIP block
 

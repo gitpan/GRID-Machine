@@ -1,3 +1,13 @@
+* Redirect input of the remote side to a named pipe?
+
+* gmsh.pl 
+   -- preamble (like in remotetest)?
+   -- tmp: use File::Spec
+   -- host file (syntax like clusters)
+   -- interpreter option to specify bash, perl, python, etc.
+   -- option -e ?
+   -- -x exclude option
+
 * cleanfiles option: bug. Esta borrando los scripts antes de tiempo
    Añadir array de PIDs al estado del objeto GRID:::Machine. 
    En open, open2, open3 y cualesquiera cosas por el estilo hay

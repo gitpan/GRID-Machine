@@ -18,6 +18,10 @@ WriteMakefile(
 );
 
 sub MY::postamble {
+
+  my $DEVELOPER = $ENV{DEVELOPER} || '';
+  return '' unless defined($DEVELOPER);
+
   # To check tests in remote machines. See goal remotetest
 	my @machines = qw{orion beowulf};
 
@@ -57,9 +61,8 @@ doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
 pdf: @files
 	atopdf @files -o /tmp/gridmachine.pdf
 
-publicdist: publish rmdist dist
+publicdist: doc rmdist dist
 	chmod a+r GRID-Machine-*.tar.gz
-	cp GRID-Machine-*.tar.gz /home/pp2/public_html/perlexamples/GRID-Machine.tar.gz
 	cp GRID-Machine-*.tar.gz /tmp/
 	chmod a+r /tmp/GRID-Machine-*.tar.gz
 
@@ -95,10 +98,6 @@ html: doc
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/perlparintro.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/remotedebugtut.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc scripts/remotetest.pl
-
-publish: doc html xdvi
-	cp *.html /home/pp2/public_html/GRID_Machine/
-	cp *.dvi /home/pp2/public_html/GRID_Machine/
 
 remotetest:
 	scripts/remotetest.pl \${DISTVNAME}.tar.gz @machines

@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use File::Temp;
+use File::Spec;
 
 sub getcwd { return getcwd() }
 
@@ -36,32 +37,47 @@ sub wrapexec {
   my $exec = shift;
 
   my $dir = getcwd;
+  my $program =<< 'EOPROG'; 
+chdir "<<$dir>>" || die "Can't change to dir <<$dir>>\n";
+%ENV = (<<$ENV>>);
+$| = 1;
+my $success = !system("<<$exec>>");
+warn "GRID::Machine::Core::wrapexec warning!. Execution of '<<$exec>>' returned Status: '$?'. Success value from system call: '$success'\n" unless $success;
+unlink('<<$scriptname>>');
+exit(0);
+EOPROG
 
-  $exec =~ /^(\S+)/;
+  $exec =~ /^\s*(\S+)/; # mmm.. no options?
   my $execname = $1;
   # Executable can be in any place of the PATH search 
-  #die "Error. Can't find executable name\n" unless  $execname && -x $execname;
+  my $where = `which $execname 2>&1`;
 
+  # skip if program 'which' can't be found otherwise check that $execname exists
+  unless ($?) {
+    die "Error. Can't find executable for command '$execname'. Where: '$where'\n" unless  $execname && $where =~ /\S/;
+  }
+
+  # name without path
   my ($name) = $execname =~ m{([\w.]+)$};
   $name ||= '';
 
   my $ENV = "'".(join "',\n  '", %ENV)."'";
 
+  # Create a temp perl script with pattern /tmp/gridmachine_driver_${name}XXXXX
   my $filename = "gridmachine_driver_${name}";
-  my $tmp = File::Temp->new( TEMPLATE => $filename.'XXXXX', DIR => '/tmp', UNLINK => 0);
+  my $tmp = File::Temp->new( TEMPLATE => $filename.'XXXXX', DIR => File::Spec->tmpdir(), UNLINK => 0);
   my $scriptname = $tmp->filename;
 
-  print $tmp <<"EOF";
-chdir "$dir" || die "Can't change to dir $dir\\n";
-\%ENV = ($ENV);
-\$| = 1;
-system("$exec") and die "GRID::Machine::Core::wrapexec error. Can't execute $exec\\n";
-unlink('$scriptname');
-EOF
+  $program =~ s/<<\$dir>>/$dir/g;
+  $program =~ s/<<\$ENV>>/$ENV/g;
+  $program =~ s/<<\$exec>>/$exec/g;
+  $program =~ s/<<\$scriptname>>/$scriptname/g;
 
-   #push @{SERVER->cleanfiles}, $scriptname; # unless shift();
-   close($tmp);
-   return $scriptname;
+  print $tmp $program;
+
+  #push @{SERVER->cleanfiles}, $scriptname; # unless shift();
+  close($tmp);
+  return $scriptname;
 }
 
 sub umask  { 
@@ -81,7 +97,7 @@ sub system {
   my $program = shift;
 
   CORE::system($program, @_);
-  return $?
+  #return $?
 }
 
 sub qqx {
