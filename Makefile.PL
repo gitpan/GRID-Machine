@@ -1,10 +1,15 @@
+use warnings;
+use strict;
 use ExtUtils::MakeMaker;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
+if ($ENV{DEVELOPER}) {
+  system(q{make -f makepods}) and warn "Something went wrong building pods: $?\n";
+}
 WriteMakefile(
     NAME              => 'GRID::Machine',
     VERSION_FROM      => 'lib/GRID/Machine.pm', # finds $VERSION
-    PREREQ_PM         => {Module::Which => '0.0205', }, 
+    PREREQ_PM         => { 'Module::Which' => '0.0205', }, 
     'EXE_FILES'       => [ # 'scripts/gmdb', # remote debugger. Not finished
                            'scripts/remotetest.pl' 
                          ],
@@ -23,30 +28,18 @@ sub MY::postamble {
   return '' unless defined($DEVELOPER);
 
   # To check tests in remote machines. See goal remotetest
-	my @machines = qw{orion beowulf};
+  my $MACHINES = $ENV{MACHINES} || '127.0.0.1 127.0.0.2';
 
-	# To print: see goal pdf
-	my @files = (
-		'TODO',
-		'lib/GRID/Machine.pm',
-		'lib/GRID/Machine/Core.pm',
-	#  'lib/GRID/Machine/MakeAccessors.pm',
-		'lib/GRID/Machine/Message.pm',
-		'lib/GRID/Machine/REMOTE.pm',
-	#  'lib/GRID/Machine/Request.pm',
-		'lib/GRID/Machine/Result.pm',
-		 'lib/GRID/Machine/IOHandle.pm',
-		 'lib/GRID/Machine/RIOHandle.pm',
-	#  'examples/MyLocal.pm',
-	#  'examples/MyRemote.pm',
-	#  'examples/extendprotocol.pl',
-	#  'examples/synopsis',1'.pl',
-	#  'examples/gprint.pl',
-	#  'examples/nestedcallback.pl',
-	#  'examples/salida',
-	);
+  return targets(
+    MACHINES     => $MACHINES,
+  );
 
-return <<"EOT";
+}
+
+sub targets {
+  my %var = @_;
+
+  local $_ = <<'EOT';
 
 doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
 	cd tt2; tpage  Machine.tt2 > ../lib/GRID/Machine.pod
@@ -58,10 +51,7 @@ doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
 	cd tt2; tpage  perlparintro.tt2 > ../lib/GRID/Machine/perlparintro.pod
 	cd tt2; tpage  remotedebugtut.tt2 > ../lib/GRID/Machine/remotedebugtut.pod
 
-pdf: @files
-	atopdf @files -o /tmp/gridmachine.pdf
-
-publicdist: doc rmdist dist
+publicdist: rmdist dist
 	chmod a+r GRID-Machine-*.tar.gz
 	cp GRID-Machine-*.tar.gz /tmp/
 	chmod a+r /tmp/GRID-Machine-*.tar.gz
@@ -100,7 +90,12 @@ html: doc
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc scripts/remotetest.pl
 
 remotetest:
-	scripts/remotetest.pl \${DISTVNAME}.tar.gz @machines
+	scripts/remotetest.pl ${DISTVNAME}.tar.gz <<MACHINES>>
+
+coverage:
+	cover -delete
+	make HARNESS_PERL_SWITCHES=-MDevel::Cover test
+	cover
 
 .PHONY: tags
 tags:
@@ -108,5 +103,108 @@ tags:
 	ctags -a --exclude=examples --exclude=t --exclude=doc --exclude=tt2
 
 EOT
+
+  # Replace variables
+  # TODO: Check that all <<variables>> are present in @_
+  for my $k (keys(%var)) {
+	  my $r = $var{$k};
+    s/<<$k>>/$r/ge;
+  }
+
+  return $_;
 }
+
+__END__
+
+=head1 NAME 
+
+Makefile.PL - Makefile generator for GRID::Machine. Developer notes
+
+=head1 SYNOPSIS
+
+=over 2
+
+=item * When working as a developer place in etc/ a script to customize your
+environment, then do s.t. like:
+
+           source etc/casianoperl5lib
+
+to set the appropriate environment variables. Some variables to set are:
+
+  PATH                  to execute scripts
+  PERL5LIB              to find any modules required
+  DEVELOPER             used by many skip tests
+  GRID_REMOTE_MACHINE   the remote machine used for testing (see C<t/*.t> files)
+  MACHINES              a white space string containing the machines
+                        for the 'remotetest' target
+
+=item * To build the documentation, you need L<Template> installed. Issue the command:
+
+  $ make -f makepods
+
+and the C<.pod> files will be built from the templates in C<tt2/>
+
+=item * To build the *.html files:
+
+   $ make -f makepods html
+
+=item * To build pdf files:
+
+   make -f makepods pdf
+
+=item * To delete generated docs (*.html, *.pdf, etc.)
+
+   make -f makepods clean
+
+=item * To run the tests on remote machines:
+
+   make remotetest
+
+(Set the environment variable C<GRID_REMOTE_MACHINE> to the remote machine. 
+
+=item * To use L<Devel::Cover> to study test coverage:
+
+   make coverage
+
+=item * To produce tags:
+
+   make tags
+
+=back
+
+=head1 DEPENDENCIES
+
+To use this C<Makefile.PL> as developer is convenient to have installed:
+
+=over 2
+
+=item * Template toolkit
+
+=item * Pod2LaTeX
+
+=item * LaTeX
+
+=item * mpod2html
+
+=item * Devel::Cover
+
+=back
+
+=head1 AUTHOR
+ 
+Casiano Rodriguez-Leon (casiano@ull.es)
+
+=head1 LICENCE AND COPYRIGHT
+ 
+Copyright (c) 2006-2009 Casiano Rodriguez-Leon (casiano@ull.es). All rights reserved.
+
+These modules are free software; you can redistribute it and/or
+modify it under the same terms as Perl itself. See L<perlartistic>.
+ 
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+
+
+
 

@@ -108,7 +108,8 @@ for my $host (@ARGV) {
       }
       else {
         system('gunzip', $dist) and die "Can't gunzip $dist\n";
-        my $tar = $dist =~ s/\.gz$//;
+        my $tar = $dist;
+        $tar =~ s/\.gz$//;
         system('tar', '-xf', $tar) and die "Can't untar $tar\n";
       }
     },
