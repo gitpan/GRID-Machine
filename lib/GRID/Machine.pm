@@ -27,7 +27,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.104";
+our $VERSION = "0.105";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -255,8 +255,8 @@ EOREMOTE
              push @sshoptions, split /\s+/, $sshoptions;
            }
 
-           #  die "Can't execute perl in $host using ssh connection with automatic authentication\n"
-           #unless is_operative("$ssh @sshoptions", $host, "perl -v", $wait);
+             die "Can't execute perl in $host using ssh connection with automatic authentication\n"
+           unless is_operative("$ssh @sshoptions", $host, "perl -v", $wait);
 
            my %sshoptions = @sshoptions;
 
@@ -293,12 +293,12 @@ EOREMOTE
              @command = ( $ssh, @sshoptions, $host, $opts{perl} || "perl", @perloptions );
            }
         }
-        
+
         my ( $readpipe, $writepipe );
-        eval {
+        #$SIG{PIPE} = sub { die "Can't execute perl in host $host using ssh connection with automatic authentication\n"; };
+        #eval {
           $pid = IPC::Open2::open2( $readpipe, $writepipe, @command );
-        };
-        die "Can't execute perl in $host using ssh connection with automatic authentication: $@\n" if $@;
+        #};
 
         $readfunc = sub {
            if( defined $_[1] ) {
@@ -347,7 +347,7 @@ EOREMOTE
          $cleanup, 
          $prefix,
          $portdebug,
-     ); 
+     );
      #print "$remoteprogram\n" if $portdebug;
 
      $writefunc->( $remoteprogram );
@@ -888,7 +888,8 @@ sub copyandmake {
   my $dir = $arg{dir} || die "copyandmake error: Provide a directory\n";
   my $target = $arg{target} || '';
   my $files = $arg{files} || [];
-  my $existsmakefile  = first { $_ eq 'Makefile' } @$files;
+  my $existsmakefile  = first { /\b[mM]akefile$/ } @$files;
+  #my $existsmakefile  = first { /.*Makefile/ } @$files;
   my $make = $existsmakefile ? 'make' : '';
   $make = $arg{make} if defined($arg{make});
   my $makeargs = $arg{makeargs} || '';
