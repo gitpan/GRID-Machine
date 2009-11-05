@@ -47,6 +47,7 @@ sub send_result {
     host 
     Indent 
     log 
+    logic_id
     logfile 
     perl
     prefix
@@ -170,11 +171,15 @@ sub send_result {
 
     my $debug = $args{debug} || 0;
 
+    # THIS IS NEW!!!!: Logic ID of the machine
+    my $logic_id = $args{logic_id};
+
     my $handler = {
       sendstdout => $sendstdout,
       readfunc => $readfunc,
       writefunc => $writefunc,
       host  => $host,
+      logic_id => $logic_id,
       cleanup  => $cleanup,
       prefix   => $prefix,
       clientpid => $clientpid, 
@@ -431,7 +436,7 @@ sub MODPUT {
 
   while (my ($name, $code) = splice @_,0,2) {
 
-    my @a = split "::", $name;
+    my @a = split "/", $name;
 
     my $module = pop @a;
     my $dir = File::Spec->catfile($self->prefix, @a);
@@ -443,9 +448,10 @@ sub MODPUT {
       chdir($dir) or $self->send_error("Error chdir $dir $@"), return; 
     }
 
-    open my $f, "> $module.pm" or $self->send_error("Error can't create file $module.pm $@"), return; 
-    print $f $code or $self->send_error("Error can't save file $module.pm $@"), return;
-    close($f) or $self->send_error("Error can't close file $module.pm $@"), return;
+    open my $f, "> $module" or $self->send_error("Error can't create file $module $@"), return; 
+    binmode $f;
+    syswrite($f, $code); #or $self->send_error("Error can't save file $module $@"), return;
+    close($f) or $self->send_error("Error can't close file $module $@"), return;
 
     chdir($pwd);
 

@@ -27,7 +27,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.105";
+our $VERSION = "0.106";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -95,6 +95,7 @@ sub find_host {
     host 
     includes
     log 
+    logic_id
     perl
     perloptions
     prefix 
@@ -122,6 +123,7 @@ sub find_host {
         $host, 
         $log, 
         $err, 
+        $logic_id,
         $startdir, 
         $startenv, 
         $pushinc, 
@@ -147,6 +149,7 @@ my \$rperl = $class->new(
   host => '$host',
   log  => '$log',
   err  => '$err',
+  logic_id => '$logic_id',
   clientpid => $$,
   startdir => '$startdir',
   startenv => { qw{ @$startenv } },
@@ -193,6 +196,10 @@ EOREMOTE
 
      my $host = "";
      my ( $readfunc, $writefunc ) = ( $opts{readfunc}, $opts{writefunc} );
+
+
+     # THIS IS NEW --> LOGIC ID FOR MACHINE
+     my $logic_id = $opts{logic_id} || 0;
 
      my $log = $opts{log} || '';
      my $err = $opts{err} || '';
@@ -339,6 +346,7 @@ EOREMOTE
          $host, 
          $log, 
          $err, 
+         $logic_id,
          $startdir, 
          $startenv, 
          $pushinc, 
@@ -352,12 +360,15 @@ EOREMOTE
 
      $writefunc->( $remoteprogram );
 
+
+
      my $self = {
         host       => $host,
         port       => $port,
         identity   => $identity,
         readfunc   => $readfunc,
         writefunc  => $writefunc,
+        logic_id   => $logic_id,
         pid        => $pid,
         sendstdout => $sendstdout,
         ssh        => $ssh,
@@ -832,19 +843,47 @@ sub modput {
     for my $module (keys(%modules)) {
       # TODO: Check if that module already exists
       #
+      # Obtains the relative path of the module
       my $path = which($module)->{$module}{path}; 
+      my $base = which($module)->{$module}{base};
+      my $relpath = File::Spec->abs2rel($path, $base);
 
       unless (defined($path) and -r $path) {
         die "Can't find module $module\n";
       }
 
-      local $/ = undef;
+      # Sends the file with .pm extension
+      my $m = "";
       open my $FILE, "< $path";
-        my $m = <$FILE>;
+      binmode $FILE;
+      my $size = -s $path;
+      read($FILE, ,$m, $size);
       close($FILE);
-      push @args, $module, $m;
+      push @args, $relpath, $m;
+
+      # Directory "auto"
+      (my $end = which($module)->{$module}{pm}) =~ s/::/\//g;
+      my $rel_auto_path = "auto/" . $end;
+      my $abs_auto_path = $base . "/" . $rel_auto_path; 
+
+      if (-e $abs_auto_path) {
+        chdir($abs_auto_path);
+        my @auto_files = glob('*');
+
+        foreach my $auto_file (@auto_files) {
+          my $m = "";
+          my $rel_auto_file_path = $rel_auto_path . "/" . $auto_file;
+          open my $FILE, "< $auto_file";
+          binmode $FILE;
+          my $size = -s $auto_file;
+          read($FILE, ,$m, $size);
+          close($FILE);
+          push @args, $rel_auto_file_path, $m;
+        }
+      }
     }
   }
+
   $self->send_operation("GRID::Machine::MODPUT", @args);
 
   return $self->_get_result();
