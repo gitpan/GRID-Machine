@@ -107,7 +107,7 @@ for my $host (@ARGV) {
         $tar->extract() or die "Archive::Tar error: Can't extract distribution $dist\n";
       }
       else {
-        system('gunzip', $dist) and die "Can't gunzip $dist\n";
+        system("gunzip $dist") and die "Can't gunzip $dist\n";
         my $tar = $dist;
         $tar =~ s/\.gz$//;
         system('tar', '-xf', $tar) and die "Can't untar $tar\n";
