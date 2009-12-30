@@ -27,7 +27,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.107";
+our $VERSION = "0.108";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -116,6 +116,7 @@ sub find_host {
 
   GRID::Machine::MakeAccessors::make_accessors(@legal);
 
+########################################################
   sub RemoteProgram {
     my ($USES,
         $REMOTE_LIBRARY,
@@ -152,7 +153,7 @@ my \$rperl = $class->new(
   logic_id => '$logic_id',
   clientpid => $$,
   startdir => '$startdir',
-  startenv => { qw{ @$startenv } },
+  startenv => $startenv,
   pushinc => [ qw{ @$pushinc } ], 
   unshiftinc => [ qw{ @$unshiftinc } ],
   sendstdout => $sendstdout,
@@ -325,7 +326,9 @@ EOREMOTE
 
      my $startdir = $opts{startdir} || '';
 
-     my $startenv = $opts{startenv} || [];
+     my $startenv = $opts{startenv} || {};
+     my @startenv = map { "'$_' => '$startenv->{$_}', "} keys(%$startenv);
+     $startenv = "{ @startenv }";
 
      my $pushinc = $opts{pushinc} || [];
      die "Arg 'pushinc' of new must be an ARRAY ref\n" unless reftype($pushinc) eq 'ARRAY';
@@ -359,8 +362,6 @@ EOREMOTE
      #print "$remoteprogram\n" if $portdebug;
 
      $writefunc->( $remoteprogram );
-
-
 
      my $self = {
         host       => $host,
