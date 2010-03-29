@@ -27,7 +27,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.108";
+our $VERSION = "0.109";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -263,8 +263,14 @@ EOREMOTE
              push @sshoptions, split /\s+/, $sshoptions;
            }
 
-             die "Can't execute perl in $host using ssh connection with automatic authentication\n"
-           unless is_operative("$ssh @sshoptions", $host, "perl -v", $wait);
+
+            # Test remote ssh operation. Thanks to Alex White
+            {
+                # surround each options with quotes in case option contains a space
+                my @test_ssh_options = map { qq{'$_'} } @sshoptions;
+                  die "Can't execute perl in $host using ssh connection with automatic authentication\n"
+                unless is_operative("$ssh @test_ssh_options", $host, "perl -v", $wait);
+             }
 
            my %sshoptions = @sshoptions;
 

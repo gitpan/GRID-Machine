@@ -18,6 +18,7 @@ t/12pipes.t
 t/13pipes.t
 t/14open2.t
 t/15startenv.t
+t/16sshoptions.t
 t/Include2.pm
 t/Include.pm
 scripts/remotetest.pl
