@@ -19,6 +19,7 @@ t/13pipes.t
 t/14open2.t
 t/15startenv.t
 t/16sshoptions.t
+t/17thom_mani.t
 t/Include2.pm
 t/Include.pm
 scripts/remotetest.pl
@@ -157,4 +158,5 @@ examples/sshoptions2.pl
 examples/sshoptions.pl
 examples/port.pl
 examples/synopsisqc.pl
+examples/17thom_manni.pl
 META.yml                                 Module meta-data (added by MakeMaker)

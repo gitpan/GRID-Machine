@@ -73,8 +73,12 @@ sub send_result {
   sub setloganderr {
     my ($log, $args, $file) = @_;
 
-    $args->{$log} = "rperl$args->{clientpid}_$$.$log" unless $args->{$log};
-    my $logname = "$ENV{HOME}/$args->{$log}";
+    my $logname = $args->{$log};
+    $logname = "$ENV{HOME}/rperl$args->{clientpid}_$$.$log" unless $logname;
+    if (-d $logname) {
+      $logname .= "/rperl$args->{clientpid}_$$.$log";
+    }
+
     my $logfile = IO::File->new("> $logname");
     unless ($logfile) {
         $SERVER->send_error("Can't open $logname for writing. $@");
