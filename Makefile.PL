@@ -10,7 +10,7 @@ WriteMakefile(
     NAME              => 'GRID::Machine',
     VERSION_FROM      => 'lib/GRID/Machine.pm', # finds $VERSION
     PREREQ_PM         => { 'Module::Which' => '0.0205', }, 
-    'EXE_FILES'       => [ # 'scripts/gmdb', # remote debugger. Not finished
+    'EXE_FILES'       => [ 'scripts/gmdb', # remote debugger. Not finished
                            'scripts/remotetest.pl' 
                          ],
     ($] >= 5.007 ?     ## Add these new keywords supported since 5.005

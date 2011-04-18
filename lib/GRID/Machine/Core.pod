@@ -29,52 +29,69 @@ aliases:
 
 =head2 Function C<system>
 
-Executes C<sytem> on the remote machine. See an example:
+Executes C<system> on the remote machine. See an example:
 
- $ cat -n transfer2.pl
-   1  #!/usr/local/bin/perl -w
-   2  use strict;
-   3  use GRID::Machine qw(is_operative);
-   4  use Data::Dumper;
-   5
-   6  my $host = shift || 'casiano@remote.machine.es';
-   7
-   8  my $machine = GRID::Machine->new(
-   9        host => $host,
-  10        cleanup => 1,
-  11        sendstdout => 1,
-  12        startdir => 'perl5lib',
-  13        prefix => '/home/casiano/perl5lib/',
-  14     );
-  15
-  16  my $dir = $machine->getcwd->result;
-  17  print "$dir\n";
-  18
-  19  $machine->modput('Parse::Eyapp::');
-  20  print $machine->system('tree');
+  $ cat -n examples/transfer2.pl 
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine qw(is_operative);
+     4  use Data::Dumper;
+     5  
+     6  my $host = shift || $ENV{GRID_REMOTE_MACHINE};
+     7  
+     8  my $machine = GRID::Machine->new( 
+     9        host => $host,
+    10        cleanup => 1,
+    11        sendstdout => 1,
+    12        startdir => '/tmp/perl5lib',
+    13        prefix => '/tmp/perl5lib/',
+    14     );
+    15  
+    16  my $dir = $machine->getcwd->result;
+    17  print "$dir\n";
+    18  
+    19  $machine->modput('Parse::Eyapp::') or die "can't send module\n";
+    20  
+    21  print $machine->system('tree');
+    22  my $r =  $machine->system('doesnotexist');
+    23  print Dumper $r;
+
+Observe the overloading of C<bool> at line 19. C<modput> returns
+a C<GRID::Machine::Result> object which is evaluated in a Boolean 
+context as a call to the C<result> getter.
 
 When executed produces an output like:
 
-  $ transfer2.pl
-  /home/casiano/perl5lib
+  $ perl -w examples/transfer2.pl 
+  /tmp/perl5lib
   .
-  `-- Parse
-      |-- Eyapp
-      |   |-- Base.pm
-      |   |-- Driver.pm
-      |   |-- Grammar.pm
-      |   |-- Lalr.pm
-      |   |-- Node.pm
-      |   |-- Options.pm
-      |   |-- Output.pm
-      |   |-- Parse.pm
-      |   |-- Scope.pm
-      |   |-- Treeregexp.pm
-      |   |-- YATW.pm
-      |   `-- _TreeregexpSupport.pm
-      `-- Eyapp.pm
+  `---- Parse
+      `---- Eyapp
+          |---- Base.pm
+          |---- Cleaner.pm
+          |---- Driver.pm
+          |---- Grammar.pm
+          |---- Lalr.pm
+          |---- Node.pm
+          |---- Options.pm
+          |---- Output.pm
+          |---- Parse.pm
+          |---- Scope.pm
+          |---- TokenGen.pm
+          |---- Treeregexp.pm
+          |---- _TreeregexpSupport.pm
+          |---- Unify.pm
+          `---- YATW.pm
 
-  2 directories, 13 files
+  2 directories, 15 files
+  $VAR1 = bless( {
+                   'stderr' => 'Can\'t exec "doesnotexist":',
+                   'errmsg' => '',
+                   'type' => 'RETURNED',
+                   'stdout' => '',
+                   'errcode' => -1,
+                   'results' => [ -1 ]
+                 }, 'GRID::Machine::Result' );
 
 =head2 Function C<qx>
 

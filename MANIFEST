@@ -20,10 +20,12 @@ t/14open2.t
 t/15startenv.t
 t/16sshoptions.t
 t/17thom_mani.t
+t/18mannierrcode.t
+t/19syntaxerr.t
 t/Include2.pm
 t/Include.pm
 scripts/remotetest.pl
-#scripts/gmdb
+scripts/gmdb
 lib/GRID/Machine.pm
 lib/GRID/Machine.pod
 lib/GRID/Machine/Core.pm

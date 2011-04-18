@@ -13,6 +13,7 @@ use IPC::Open2();
 use IPC::Open3();
 use Carp;
 use File::Spec;
+use File::Temp;
 use IO::File;
 use base qw(Exporter);
 use GRID::Machine::IOHandle;
@@ -27,7 +28,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.110";
+our $VERSION = "0.111";
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -49,7 +50,7 @@ sub read_modules {
         die "Can't find module $module\n";
       }
 
-      $m .= "#line 1 \"$path\"\n";
+      $m .= "# source from: #line 1 \"$path\"\n";
       local $/ = undef;
       open my $FILE, "< $path";
         $m .= <$FILE>;
@@ -102,12 +103,14 @@ sub find_host {
     pushinc unshiftinc
     readfunc 
     remotelibs
+    report
     scp 
     sendstdout
     ssh 
     sshpipe 
     sshoptions 
     startdir startenv 
+    tmpdir
     uses
     wait 
     writefunc 
@@ -133,11 +136,13 @@ sub find_host {
         $cleanup, 
         $prefix,
         $portdebug,
+        $report,
+        $tmpdir,
        ) 
     = @_;
 
    return << "EOREMOTE";
-#line 1 "$host"
+#line 1 "$prefix/REMOTE.pm"
 package GRID::Machine;
 use strict;
 use warnings;
@@ -160,6 +165,8 @@ my \$rperl = $class->new(
   cleanup => $cleanup,
   prefix  => '$prefix', # Where to install modules
   debug => $portdebug,
+  report => q{$report},
+  tmpdir => q{$tmpdir},
 );
 \$rperl->main();
 __END__
@@ -175,6 +182,7 @@ EOREMOTE
 
 
      my $portdebug = $opts{debug} || 0;
+    
      my $sendstdout = 1;
      $sendstdout = $opts{sendstdout} if exists($opts{sendstdout});
      ###########################################################################
@@ -201,9 +209,11 @@ EOREMOTE
 
      # THIS IS NEW --> LOGIC ID FOR MACHINE
      my $logic_id = $opts{logic_id} || 0;
-
      my $log = $opts{log} || '';
      my $err = $opts{err} || '';
+     my $report = $opts{report} || '';
+     my $tmpdir = $opts{tmpdir} || '';
+
      my $wait = $opts{wait} || 15;
      my $cleanup = $opts{cleanup};
      my $ssh = $opts{ssh} || 'ssh';
@@ -299,9 +309,16 @@ EOREMOTE
              #my $perl = qq{PERLDB_OPTS="RemotePort=$purehost:$portdebug" }.($opts{perl} || 'perl -d');
              my $perl = qq{PERLDB_OPTS="RemotePort=localhost:$portdebug" }.($opts{perl} || 'perl -d');
              @command = ( "$ssh @sshoptions $host $perl @perloptions" );
-             print "Debugging with '@command'\n".
-                   "Remember to run in $host: 'netcat -v -l -p $portdebug'\n".
-                   "or 'socat -d READLINE,history=\$HOME/.perldbhistory TCP4-LISTEN:$portdebug,reuseaddr'\n\n";
+             print <<"HELPMSG";
+Debugging with '@command'
+Remember to run in a separate terminal
+     gmdb $host $portdebug
+or connect in another terminal via ssh to $host and run in $host netcat:
+     netcat -v -l -p $portdebug
+or, better, if you have 'socat' installed in $host:
+     socat -d READLINE,history=\$HOME/.perldbhistory TCP4-LISTEN:$portdebug,reuseaddr
+
+HELPMSG
            }
            else {
              @command = ( $ssh, @sshoptions, $host, $opts{perl} || "perl", @perloptions );
@@ -309,10 +326,14 @@ EOREMOTE
         }
 
         my ( $readpipe, $writepipe );
-        #$SIG{PIPE} = sub { die "Can't execute perl in host $host using ssh connection with automatic authentication\n"; };
-        #eval {
+
+          open my $saverr, ">& STDERR";
+          open STDERR, "> /dev/null";
+
           $pid = IPC::Open2::open2( $readpipe, $writepipe, @command );
-        #};
+
+          close STDERR;
+          open STDERR, ">&", $saverr; # restore
 
         $readfunc = sub {
            if( defined $_[1] ) {
@@ -364,14 +385,15 @@ EOREMOTE
          $cleanup, 
          $prefix,
          $portdebug,
+         $report,
+         $tmpdir,
      );
-     #print "$remoteprogram\n" if $portdebug;
 
-     $writefunc->( $remoteprogram );
 
      my $self = {
         host       => $host,
         port       => $port,
+        debug      => $portdebug,
         identity   => $identity,
         readfunc   => $readfunc,
         writefunc  => $writefunc,
@@ -398,6 +420,10 @@ EOREMOTE
 
          unshift @{$misa}, 'GRID::Machine'
      unless first { $_ eq 'GRID::Machine' } @{$misa};
+
+     $self->putstringcode($remoteprogram, 'REMOTE.pm')  if $portdebug;
+
+     $writefunc->( $remoteprogram );
 
      # Allow the user to include their own
      $self->include('GRID::Machine::Core');
@@ -438,12 +464,12 @@ sub eval {
    my $self = shift;
    my ( $code, @args ) = @_;
 
-#   my ($package, $filename, $line) = caller;
-#   $code = <<"EOCODE";
+   my ($package, $filename, $line) = caller;
+   $code = <<"EOCODE";
 #package $package;
-##line $line "$filename"
-#$code
-#EOCODE
+#line $line "$filename"
+$code
+EOCODE
    $self->send_operation( "GRID::Machine::EVAL", $code, \@args );
 
    return $self->_get_result();
@@ -474,8 +500,17 @@ sub exists {
 sub sub {
    my $self = shift;
    my $name = shift;
+   my $code = shift;
 
-   my $ok = $self->compile( $name, @_);
+   if ($code !~ /^#line \d+/m) {
+     my ($package, $filename, $line) = caller;
+     $code = <<"EOCODE";
+#package $package; sub $name
+#line $line "$filename"
+$code
+EOCODE
+   }
+   my $ok = $self->compile( $name, $code, @_);
 
    return $ok if (blessed($ok) && $ok->type eq 'DIED');
 
@@ -602,6 +637,8 @@ sub slurp_file {
     my $desc = shift; 
     my %args = @_;
 
+    $self->modput($desc) if $self->{debug};
+
     my $exclude = $args{exclude} || [];
     my %exclude;
 
@@ -633,8 +670,8 @@ sub slurp_file {
                          |(__END__)                      # 3
                          |(\n=(?:head[1-4]|pod|over|begin|for)) # 4 pod
                          |(\#.*)                                # 5
-                         |("(?:\\.|[^"])*") # 6 "double quoted string"
-                         |('(?:\\.|[^'])*') # 7 'single quoted string'
+                         |("(?:\\.|[^"])*") # 6 "double quoted string" #"
+                         |('(?:\\.|[^'])*') # 7 'single quoted string' #'
                          #  to be done: <<"HERE DOCS"
                          #  q, qq, etc.
                          |(?:use\s+(.*)) # 8 use Something qw(chuchu chim);
@@ -750,9 +787,11 @@ sub is_operative {
         local $SIG{ALRM} = sub { die "Alarm exceeded $seconds seconds"; };
         alarm($seconds);
 
-          my ( $savestdout, $savestdin);
+          my ( $savestdout, $savestdin, $savestderr);
           open($savestdout, ">& STDOUT"); # factorize!
+          open($savestderr, ">& STDERR"); # factorize!
           open(STDOUT,">", $devnull);
+          open(STDERR,">", $devnull);
 
           open($savestdin, "<& STDIN");
           open(STDIN,">", $devnull);
@@ -760,6 +799,7 @@ sub is_operative {
             $operative = !system("$ssh $host $command");
 
           open(STDOUT, ">&", $savestdout);
+          open(STDERR, ">&", $savestderr);
           open(STDIN, "<&", $savestdin);
 
         alarm(0);
@@ -769,6 +809,28 @@ sub is_operative {
         return 0;
     }
     return $operative;
+}
+
+sub putstringcode {
+  my $self = shift;
+  my $code = shift;
+  my $target = shift;
+
+  my $fh = File::Temp->new(UNLINK => 1);
+  my $fname = $fh->filename;
+  print $fh $code;
+  close($fh);
+  my $dest = "$self->{prefix}/$target";
+  
+  my $host = $self->host;
+  die "put error: host is not defined\n" unless defined($host);
+
+  my $scp = $self->{scp};
+  die "put error: scp is not defined\n" unless defined($scp);
+
+  system("$scp $fname $host:$dest") and die "GRID::Machine::put Error: Copying file $fname to $host:$dest\n";
+
+  unlink $fname;
 }
 
 sub put {
@@ -852,12 +914,13 @@ sub modput {
       #
       # Obtains the relative path of the module
       my $path = which($module)->{$module}{path}; 
-      my $base = which($module)->{$module}{base};
-      my $relpath = File::Spec->abs2rel($path, $base);
 
       unless (defined($path) and -r $path) {
         die "Can't find module $module\n";
       }
+
+      my $base = which($module)->{$module}{base};
+      my $relpath = File::Spec->abs2rel($path, $base);
 
       # Sends the file with .pm extension
       my $m = "";

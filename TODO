@@ -1,3 +1,60 @@
+* Add to "sub include" the parsing of attributes as:
+    - compute line number, set it in sub call
+    - transfer file if debugging
+    - "context" (send the context scalar/list to the remote sub
+    - "filter" Filter output
+
+* a handler for CTRL-C that removes the temporary files and kills the remote
+
+* GRID::Machine::RemoteSub
+   other attributes: source file, source package, source line, etc
+
+* make test with transfer2.pl when the module does not exist!!
+
+* document overloading of bool
+
+* en el new de REMOTE estoy añadiendo reportfile
+  para tener un autentico fichero de log
+  Reutilizo setloganderr. El usuario puede definirlo
+
+* fork: document
+    start, poll, wait, kill, exit_status
+    fork is the constructor ?
+    Create the class GRID::Machine::Process
+                               machine
+                               PID
+                               stdin
+                               stdout
+                               stderr
+                               terminal?
+
+* make a test for gdb without netcat listening
+* finish gmdb
+      * Write a debugger. Write documentation about debugging
+      * make macros to debug functions bn "name of function"
+      * remotelog msg
+         - make it optional 
+         - where to save it. Temp file
+
+* mmmm. It will be better to save them using the open &> syntax?
+            { # Compatibility with the past: aliases
+              no warnings;
+              *rstdout = \&stdout;
+              *rstderr = \&stderr;
+            }
+
+   -find out how to with netcat
+
+* Do not leave temporary files in the home directory of the remote machine!
+
+* $pid = m->fork 'tutu';
+    Executes a fork and calls remote 'tutu', returns the PID
+    When the remote call finishes, writes to a file the perl result, IO, etc.  serialized via a Data::Dumper
+
+  $r = m->collec($pid) returns undef or a GRID::Machine::Result with the result
+  undef means it hasn't finished
+
+
 * Redirect input of the remote side to a named pipe?
 
 * gmsh.pl 
@@ -46,7 +103,6 @@ de conexion virtual ssh
 
 * sub x : public (install a synonym of the sub in the hash)
 
-* Write a debugger. Write documentation about debugging
 
 * evalfile: read file and eval
 
@@ -69,14 +125,9 @@ de conexion virtual ssh
     of the function
     - prototype("CORE::length")
 
-* Add to "sub include" the parsing of attributes as:
-    - "context" (send the context scalar/list to the remote sub
-    - "filter" Filter output
-    - 
-* log files (stdout, stderr) in a subdir?
+
 
 * encapsulate the freeze-thaw method with the subroutine object (for example matrix multiplication with PDL)
-* edebug. Remote debug
 * Parameters for new:
     -- tar
     -- untar

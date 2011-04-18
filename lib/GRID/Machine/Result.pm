@@ -1,6 +1,7 @@
 package GRID::Machine::Result;
 use List::Util qw(first);
-use overload q("") => 'str';
+use overload q("") => 'str',
+             bool  => 'result';
 
 my @legal = qw(type stdout stderr results errcode errmsg);
 my %legal = map { $_ => 1 } @legal;

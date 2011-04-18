@@ -14,6 +14,7 @@ sub send_error {
   my $server = shift;
   my $message = shift;
 
+  $server->remotelog($message);
   $server->send_operation( 
     "DIED",
     GRID::Machine::Result->new( errmsg  => "$server->{host}: $message"),
@@ -53,10 +54,12 @@ sub send_result {
     prefix
     pushinc 
     readfunc 
+    report
     sendstdout
     startdir 
     startenv
     stored_procedures
+    tmpdir
     unshiftinc
     writefunc 
   );
@@ -70,11 +73,21 @@ sub send_result {
     return $SERVER;
   }
 
-  sub setloganderr {
-    my ($log, $args, $file) = @_;
+  sub set_tmpdir {
+    my $workdir = File::Spec->tmpdir()."/rperl";
+    $workdir .= '1' while (-f $workdir) or (-d $workdir and !(-w $workdir));
+    
+    return $workdir;
+  }
+
+  sub setloganderr { # and set report too
+    my ($log, $args, ) = @_;
+
+
+    my $workdir = $SERVER->{tmpdir};
 
     my $logname = $args->{$log};
-    $logname = "$ENV{HOME}/rperl$args->{clientpid}_$$.$log" unless $logname;
+    $logname = "$workdir/$args->{clientpid}_$$.$log" unless $logname;
     if (-d $logname) {
       $logname .= "/rperl$args->{clientpid}_$$.$log";
     }
@@ -198,22 +211,25 @@ sub send_result {
 
       # Used to store remote subroutines. A remote sub is a GRID::Machine::RemoteSub object
       stored_procedures => {},
+      report => $args{report},
+      tmpdir => $args{tmpdir},
       debug => $debug,
     };
 
     $SERVER = bless $handler, $class;
 
-    # Create it if it does not exist? (the directories I mean)
-    # What if it is absolute?
+    $SERVER->{tmpdir} = set_tmpdir() unless $SERVER->{tmpdir};
+    mkdir $SERVER->{tmpdir} if !(-d $SERVER->{tmpdir});
 
-    setloganderr('log', \%args, 'stdout');
+    setloganderr('log', \%args, );
     # redirect STDOUT - once per remote session! (-dk-)
     open(STDOUT,"> $SERVER->{log}") or do {
         $SERVER->send_error("Can't redirect STDOUT. $@");
         return $SERVER
     };
 
-    setloganderr('err', \%args, 'stderr');
+    setloganderr('err', \%args, );
+    setloganderr('report', \%args, );
 
     return $SERVER;
   }
@@ -241,13 +257,16 @@ sub read_stdfiles {
   if ($sendstdout) {
     local $/ = undef;
     my $file;
-    open($file, $log) or return (); 
+    open($file, $log) or do { 
+        $server->remotelog(qq{Can't open stdout file '$log'}); 
+        return (); 
+      };
       $rstdout = <$file>;
-    close($file);
+    close($file) or $server->remotelog(qq{Closing stdout file '$log'});
 
-    open($file, $err) or return (); 
+    open($file, $err) or do { $server->remotelog(qq{Can't open stderr file '$err'}); return (); };
       $rstderr = <$file>;
-    close($file);
+    close($file) or $server->remotelog(qq{Can't close stderr file '$err'}); 
   }
   return ($rstdout, $rstderr);
 }
@@ -256,9 +275,9 @@ sub eval_and_read_stdfiles {
   my $server = shift;
   my $subref = shift;
 
-      my @results = eval { $subref->( @_ ) };
+  my @results = eval { $subref->( @_ ) };
 
-  my $err = $@;
+  my $err = "$@$!";
   my @output = $server->read_stdfiles;
 
     # handling 'GRID::Machine::QUIT' when waiting for 'RESULT' from callback (-dk-)
@@ -275,6 +294,7 @@ sub eval_and_read_stdfiles {
   return GRID::Machine::Result->new(
     stdout => $rstdout, 
     errmsg  => $err, 
+    errcode => $?,
     stderr => $rstderr, 
     results => \@results
   );
@@ -286,7 +306,9 @@ sub EVAL {
   my $subref = eval "use strict; sub { $code }";
 
   if( $@ ) {           # Error while compiling code
-     $server->send_error("Error while compiling eval. $@");
+     # get rid off of the "#line" header
+     $code =~ s{^#package\s\w+;\s+#line\s+\d+\s+"[\\/\w.-]+"\s*}{};
+     $server->send_error("Error while compiling eval '".substr($code,0,20)."...'\n$@");
      return;
   }
 
@@ -321,9 +343,9 @@ sub STORE {
   my $politely = $args{politely} || 0; 
   delete($args{politely});
 
-  my $subref = eval qq{ sub { use strict;0; #$name\n$code } };
+  my $subref = eval qq{ sub { use strict; $code } };
   if( $@ ) {
-     $server->send_error("Error while compiling $name. $@");
+     $server->send_error("Error while compiling '$name'. $@");
      return;
   }
 
@@ -418,9 +440,9 @@ sub CALL {
   }
 
   # -dk- look for anonymous callback(s)
-  my $results = eval_and_read_stdfiles($server, $subref, map(
-      UNIVERSAL::isa($_, 'GRID::Machine::_RemoteStub') ? make_callback($server, $_->{id}) : $_,
-  @$args ) );
+  my $results = eval_and_read_stdfiles($server, $subref, 
+           map(UNIVERSAL::isa($_, 'GRID::Machine::_RemoteStub') ? make_callback($server, $_->{id}) : $_, @$args ) 
+  );
 
   if( $@ ) {
      $server->send_error("Error running sub $name: $@");
@@ -513,8 +535,11 @@ sub OPEN {
 sub DESTROY {
   my $self = shift;
 
-  unlink $self->{log} if -w  $self->{log} and $self->{cleanup};
-  unlink $self->{err} if -w  $self->{err} and $self->{cleanup};
+  close($self->{report});
+
+  unlink $self->{log} if -w  $self->{log};
+  unlink $self->{err} if -w  $self->{err};
+  unlink $self->{report} if -w  $self->{report} and $self->{cleanup};
 
   my $cleanfiles = $self->cleanfiles;
   if (reftype($cleanfiles) eq 'ARRAY') {
@@ -533,13 +558,20 @@ sub DESTROY {
   }
 }
 
+sub remotelog {
+  my $server = shift;
+  my $msg = join '', @_;
+  #my ($package, $filename, $line, $subroutine,) = caller(1);
+  #$subroutine = "$filename:$line" if $subroutine =~/__ANON__$/;
+  syswrite $server->{reportfile},"$$:".scalar(localtime)." => $msg\n";
+}
+
 #########  Remote main() #########
 sub main() {
   my $server = shift;
 
   # Create filter process
   # Check $server is a GRID::Machine
-
   {
   package main;
   while( 1 ) {
@@ -588,7 +620,7 @@ sub DEBUG_LOAD_FINISHED {
 package GRID::Machine::RemoteSub;
 
 {
-  my @legal = qw( sub filter );
+  my @legal = qw( sub filter ); # other attributes: source file, source package, source line, etc
   my %legal = map { $_ => 1 } @legal;
 
   GRID::Machine::MakeAccessors::make_accessors(@legal);

@@ -383,31 +383,63 @@ file:
 =item * log
 
 Relative path of the file where remote C<STDOUT> will be redirected.
-Each time a RPC occurs STDOUT is redirected to a file. By default the name of this file
-is C<$ENV{HOME}/rperl$$.log>, where C<$$> is the PID of the process running
+Each time a RPC occurs STDOUT is redirected to a file. 
+By default the name of this file
+is C<$TMP/rperl$LOCALPID_$REMOTEPID.log>, where C<$TMP> is the name of the temporary directory
+as returned by C<File::Spec->tmpdir()>, C<$LOCALPID> is the PID of the process running in the local machines
+and C<$REMOTEPID> is the PID of the process running
 in the remote machine.
 
 =item * err
 
 Relative path of the file where remote C<STDERR> will be redirected.
-Each time a RPC occurs STDERR is redirected to a file. By default the name of this file
-is C<$ENV{HOME}/rperl$$.err>, where C<$$> is the PID of the process running
+Each time a RPC occurs STDERR is redirected to a file. 
+By default the name of this file
+is C<$TMP/rperl$LOCALPID_$REMOTEPID.err>, where C<$TMP> is the name of the temporary directory
+as returned by C<File::Spec->tmpdir()>, C<$LOCALPID> is the PID of the process running in the local machines
+and C<$REMOTEPID> is the PID of the process running
 in the remote machine.
+
+=item * report
+
+Relative path of the report file where the (remote) method
+C<remotelog> writes.
+By default the name of this file
+is C<$TMP/rperl$LOCALPID_$REMOTEPID.report>, where C<$TMP> is the name of the temporary directory
+as returned by C<File::Spec->tmpdir()>, C<$LOCALPID> is the PID of the process running in the local machines
+and C<$REMOTEPID> is the PID of the process running
+in the remote machine. Set C<cleanup> to false to keep this file.
+
 
 When executing the following program:
 
+  $ cat logerr.pl 
   use strict;
   use GRID::Machine;
 
-  my $machine = GRID::Machine->new( host => $ENV{GRID_REMOTE_MACHINE} || shift);
-  print $machine->eval(q{ system('ls -l *.err *.log') })->stdout;
+  my $machine = GRID::Machine->new( host => $ENV{GRID_REMOTE_MACHINE}, cleanup => 0);
+  print $machine->eval(q{ 
+    print File::Spec->tmpdir()."\n";
+    my @files =  glob(File::Spec->tmpdir().'/rperl/*');
+    local $" = "\n";
+    print "@files\n";
+    SERVER->remotelog("This message will be saved in the report file");
+  });
+
 
 the output will be similar to this:
 
-  $ logerr.pl
-  -rw-r--r-- 1 casiano casiano 0 2007-09-05 13:15 rperl22694.err
-  -rw-r--r-- 1 casiano casiano 0 2007-09-05 13:15 rperl22694.log
+  ~/grid-machine/examples$ perl logerr.pl 
+  /tmp
+  /tmp/rperl/1309_4318.err
+  /tmp/rperl/1309_4318.log
+  /tmp/rperl/1309_4318.report
 
+
+The C<report> file contains:
+
+  $ ssh $GRID_REMOTE_MACHINE cat /tmp/rperl/1309_4318.report
+  4318:Sat Apr 16 20:28:22 2011  => This message will be saved in the report file
 
 =item * wait
 
@@ -836,103 +868,42 @@ In the following example the code to eval has an error (variable
 C<$q> is not declared):
 
 
-    use GRID::Machine;
-    use Data::Dumper;
+  ~/grid-machine/examples$ cat -n syntaxerr2.pl 
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  use Data::Dumper;
+     5  
+     6  my $machine = GRID::Machine->new(host => 'user@machine.domain.es');
+     7  
+     8  my $p = { name => 'Peter', familyname => [ 'Smith', 'Garcia'] };
+     9  
+    10  my $r = $machine->eval( q{ $q = shift; $q->{familyname} }, $p);
+    11  
+    12  die  Dumper($r) unless $r->ok;
+    13  
+    14  print "Still alive\n";
 
-    my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
-
-    my $p = { name => 'Peter', familyname => [ 'Smith', 'Garcia'] };
-
-    my $r = $machine->eval( q{ $q = shift; $q->{familyname} }, $p);
-
-    die  Dumper($r) unless $r->ok;
-
-    print "Still alive\n";
 
 When executed this code produces something like:
 
-  $ syntaxerr2.pl
   $VAR1 = bless( {
-     'stderr' => '',
-     'errmsg' => 'user@remote.machine.domain: Error compiling code  $q = shift; $q->{familyname}. \
-       Global symbol "$q" requires explicit package name at (eval 27) line 1, <STDIN> line 32. \
-       Global symbol "$q" requires explicit package name at (eval 27) line 1, <STDIN> line 32.',
-     'type' => 'DIED',
-     'stdout' => '',
-     'errcode' => 0
-   }, 'GRID::Machine::Result' );
+                 'stderr' => '',
+                 'errmsg' => 'user@machine.domain.es: Error while compiling eval \'$q = shift; $q->{fam...\'
+                  Global symbol "$q" requires explicit package name at syntaxerr2.pl line 10, <STDIN> line 230.
+                  Global symbol "$q" requires explicit package name at syntaxerr2.pl line 10, <STDIN> line 230.',
+                 'type' => 'DIED',
+                 'stdout' => '',
+                 'errcode' => 0
+               }, 'GRID::Machine::Result' );
+
+The error message accurately reports the correct source offending line.
 
 C<GRID::Machine::Result> objects have an C<ok> method which
 returns TRUE if the RPC call didn't died. Therefore a common idiom
 after a RPC is:
 
                           die "$r" unless $r->ok;
-
-The former error message though accurate 
-
-          Global symbol "$q" requires ...
-
-does not tell the exact line number and file source. 
-Use a C<#line> pragma (see line 11 below) to get better diagnostics:
-
-     $ cat -n syntaxerr4.pl
-     1  #!/usr/local/bin/perl -w
-     2  use strict;
-     3  use GRID::Machine;
-     4  use Data::Dumper;
-     5
-     6  my $machine = GRID::Machine->new(host => 'user@remote.machine.domain');
-     7
-     8  my $p = { name => 'Peter', familyname => [ 'Smith', 'Garcia'] };
-     9
-    10  my $r = $machine->eval( q{
-    11  #line 12 syntaxerr4.pl
-    12      $q = shift;
-    13      $q->{familyname}
-    14    }, $p
-    15  );
-    16
-    17  die "$r" unless $r->ok;
- 
-Now the execution produces the following output:
-
- $ syntaxerr4.pl
-  user@remote.machine.domain: Error compiling code. \
-    Global symbol "$q" requires explicit package name at syntaxerr4.pl line 12, \
-    <STDIN> line 32.
-    Global symbol "$q" requires explicit package name at syntaxerr4.pl line 13, \
-    <STDIN> line 32.
-
-However, if the code is moved from line 12 to other place we must change the C<#line> 
-pragma. This is inconvenient. Instead of hardcoding the line number
-use the C<qc> function instead:
-
- $ cat -n syntaxerr5.pl
-     1  #!/usr/local/bin/perl -w
-     2  use strict;
-     3  use GRID::Machine qw(qc);
-     4  use Data::Dumper;
-     5
-     6  my $machine = GRID::Machine->new(host => 'casiano@orion.pcg.ull.es');
-     7
-     8  my $p = { name => 'Peter', familyname => [ 'Smith', 'Garcia'] };
-     9
-    10  my $r = $machine->eval( qc(q{
-    11      $q = shift;
-    12      $q->{familyname}
-    13    }), $p
-    14  );
-    15
-    16  die "$r" unless $r->ok;
-
-Now the execution of the program produces the following output:
-
- $ syntaxerr5.pl
-  casiano@orion.pcg.ull.es: Error while compiling eval. \
-  Global symbol "$q" requires explicit package name at ./syntaxerr5.pl line 11, \
-  <STDIN> line 194.
-  Global symbol "$q" requires explicit package name at ./syntaxerr5.pl line 12, \
-  <STDIN> line 194.
 
 =head3 Scope and Visibility Issues
 
@@ -1908,52 +1879,69 @@ aliases:
 
 =head2 Function C<system>
 
-Executes C<sytem> on the remote machine. See an example:
+Executes C<system> on the remote machine. See an example:
 
- $ cat -n transfer2.pl
-   1  #!/usr/local/bin/perl -w
-   2  use strict;
-   3  use GRID::Machine qw(is_operative);
-   4  use Data::Dumper;
-   5
-   6  my $host = shift || 'casiano@remote.machine.es';
-   7
-   8  my $machine = GRID::Machine->new(
-   9        host => $host,
-  10        cleanup => 1,
-  11        sendstdout => 1,
-  12        startdir => 'perl5lib',
-  13        prefix => '/home/casiano/perl5lib/',
-  14     );
-  15
-  16  my $dir = $machine->getcwd->result;
-  17  print "$dir\n";
-  18
-  19  $machine->modput('Parse::Eyapp::');
-  20  print $machine->system('tree');
+  $ cat -n examples/transfer2.pl 
+     1  #!/usr/local/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine qw(is_operative);
+     4  use Data::Dumper;
+     5  
+     6  my $host = shift || $ENV{GRID_REMOTE_MACHINE};
+     7  
+     8  my $machine = GRID::Machine->new( 
+     9        host => $host,
+    10        cleanup => 1,
+    11        sendstdout => 1,
+    12        startdir => '/tmp/perl5lib',
+    13        prefix => '/tmp/perl5lib/',
+    14     );
+    15  
+    16  my $dir = $machine->getcwd->result;
+    17  print "$dir\n";
+    18  
+    19  $machine->modput('Parse::Eyapp::') or die "can't send module\n";
+    20  
+    21  print $machine->system('tree');
+    22  my $r =  $machine->system('doesnotexist');
+    23  print Dumper $r;
+
+Observe the overloading of C<bool> at line 19. C<modput> returns
+a C<GRID::Machine::Result> object which is evaluated in a Boolean 
+context as a call to the C<result> getter.
 
 When executed produces an output like:
 
-  $ transfer2.pl
-  /home/casiano/perl5lib
+  $ perl -w examples/transfer2.pl 
+  /tmp/perl5lib
   .
-  `-- Parse
-      |-- Eyapp
-      |   |-- Base.pm
-      |   |-- Driver.pm
-      |   |-- Grammar.pm
-      |   |-- Lalr.pm
-      |   |-- Node.pm
-      |   |-- Options.pm
-      |   |-- Output.pm
-      |   |-- Parse.pm
-      |   |-- Scope.pm
-      |   |-- Treeregexp.pm
-      |   |-- YATW.pm
-      |   `-- _TreeregexpSupport.pm
-      `-- Eyapp.pm
+  `---- Parse
+      `---- Eyapp
+          |---- Base.pm
+          |---- Cleaner.pm
+          |---- Driver.pm
+          |---- Grammar.pm
+          |---- Lalr.pm
+          |---- Node.pm
+          |---- Options.pm
+          |---- Output.pm
+          |---- Parse.pm
+          |---- Scope.pm
+          |---- TokenGen.pm
+          |---- Treeregexp.pm
+          |---- _TreeregexpSupport.pm
+          |---- Unify.pm
+          `---- YATW.pm
 
-  2 directories, 13 files
+  2 directories, 15 files
+  $VAR1 = bless( {
+                   'stderr' => 'Can\'t exec "doesnotexist":',
+                   'errmsg' => '',
+                   'type' => 'RETURNED',
+                   'stdout' => '',
+                   'errcode' => -1,
+                   'results' => [ -1 ]
+                 }, 'GRID::Machine::Result' );
 
 =head2 Function C<qx>
 
@@ -2534,6 +2522,8 @@ we get the following output:
 =head2 The C<result> Method
 
 Returns the first element of the list referenced by the C<results> attribute
+This method is called when a C<GRID::Machine::Result> object is evaluated in a Boolean 
+context (i.e. C<bool> is overloaded).
 
 =head2 The C<Results> Method
 

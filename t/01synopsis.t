@@ -64,7 +64,6 @@ SKIP: {
 
   $r = $machine->sub(
     read_all => q{
-  #line 56  err1.pl
       my $filename = shift;
       my $FILE;
       local $/ ) undef; # line X1 <-- error!!!

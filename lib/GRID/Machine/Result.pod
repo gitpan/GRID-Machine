@@ -102,6 +102,8 @@ we get the following output:
 =head2 The C<result> Method
 
 Returns the first element of the list referenced by the C<results> attribute
+This method is called when a C<GRID::Machine::Result> object is evaluated in a Boolean 
+context (i.e. C<bool> is overloaded).
 
 =head2 The C<Results> Method
 

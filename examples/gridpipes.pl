@@ -6,8 +6,8 @@ use GRID::Machine;
 use Time::HiRes qw(time gettimeofday tv_interval);
 
 #my @machine = qw{europa};
-my @machine = qw{europa beowulf orion};
-#my @machine = qw{nereida nereida nereida nereida};
+#my @machine = qw{europa beowulf orion};
+my @machine = qw{nereida europa};
 #my @machine = qw{127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4};
 #my @machine = qw{beo chum};
 my $nummachines = @machine;

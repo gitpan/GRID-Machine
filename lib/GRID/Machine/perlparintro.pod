@@ -253,17 +253,17 @@ the processors. The machines will be numbered from 0 to C<np-1>
 the areas of roughly C<N/np> intervals. To achieve  a higher performance
 the code to execute on each machine is written in C:
 
-  pp2@nereida:~/LGRID_Machine/examples$ cat -n pi.c
+  ~/src/perl/grid-machine/examples$ cat -n pi.c
      1  #include <stdio.h>
      2  #include <stdlib.h>
-     3
+     3  
      4  main(int argc, char **argv) {
      5    int id, N, np, i;
      6    double sum, left;
-     7
-     8    if (argc != 4) {
+     7  
+     8    if (argc != 4) { 
      9      printf("Usage:\n%s id N np\n",argv[0]);
-    10      exit(1);
+    10      exit(1); 
     11    }
     12    id = atoi(argv[1]);
     13    N = atoi(argv[2]);
@@ -274,7 +274,9 @@ the code to execute on each machine is written in C:
     18    }
     19    sum /= N;
     20    printf("%lf\n", sum);
-    21  }
+    21    exit(0);
+    22  }
+
 
 The program receives (lines 8-14) three arguments: The first one, C<id>,
 identifies the machine with a logical number, the second one, C<N>,
@@ -356,15 +358,15 @@ stored inside the hash C<%machine> (line 44).
     30  for (@machine){
     31    my $m = GRID::Machine->new(host => $_, debug => $debug{$_}, );
     32
-    33      $m->copyandmake(
-    34        dir => 'pi',
-    35        makeargs => 'pi',
-    36        files => [ qw{pi.c Makefile} ],
-    37        cleanfiles => $cleanup,
-    38        cleandirs => $cleanup, # remove the whole directory at the end
-    39      )
-    40    unless $m->_x("pi/pi")->result;
-    41
+    33    $m->copyandmake(
+    34      dir => 'pi',
+    35      makeargs => 'pi',
+    36      files => [ qw{pi.c Makefile} ],
+    37      cleanfiles => $cleanup,
+    38      cleandirs => $cleanup, # remove the whole directory at the end
+    39      keepdir => 1
+    40    ); 
+    41    $m->chdir("pi/");
     42    die "Can't execute 'pi'\n" unless $m->_x("pi")->result;
     43
     44    $machine{$_} = $m;
@@ -389,9 +391,6 @@ created directory and all the files below it. Observe that the directory and the
 will be kept if they were'nt created by this connection.
 The call to C<copyandmake> by default sets C<dir> as the current directory in the remote
 machine. Use the option C<keepdir =E<gt> 1> to one to avoid this.
-
-The condition at line 40 checks for the existence of the executable C<pi>:
-No transference will be done if an executable in C<pi/pi> already exists.
 
 After the involved files are transferred and executables have been built,
 the program proceeds to open C<$np> processes. The call to

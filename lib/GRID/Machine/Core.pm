@@ -96,7 +96,9 @@ sub mkdir  {
 sub system {
   my $program = shift;
 
-  CORE::system($program, @_);
+  my $r = CORE::system($program, @_);
+  SERVER->remotelog("system '$program @_' executed \$?= $?, \$\@ = '$@', ! = '$!'");
+  $r;
   #return $?
 }
 
@@ -110,18 +112,44 @@ sub qqx {
   scalar(`$program`);
 }
 
-sub _fork {
+sub fork {
   my $childcode = shift;
+  my %args = (stdin => '/dev/null', stdout => '/dev/null', stderr => '/dev/null', @_);
+
 
   my $pid = fork;
-  die "Can't fork\n" unless defined($pid);
+  unless (defined($pid)) {
+    SERVER->remotelog("$$ Can't fork\n"); 
+    return undef;
+  }
   return $pid if ($pid);
 
   # child
 
-  my $subref = eval "use strict; sub { $childcode }";
+  my $subref = eval <<"EOSUB";
+use strict; 
+sub { 
+    use POSIX qw{setsid};
+    setsid(); 
+    open(STDIN, "< $args{stdin}");
+    open(STDOUT,"> $args{stdout}");
+    open(STDERR,"> $args{stderr}");
+
+  $childcode 
+};
+EOSUB
   $subref->(@_);
   exit(0);
+}
+
+sub slurp {
+  my $filename = shift;
+
+  local $/ = undef;
+
+  open(my $f, "<", $filename) or die "Can't find file '$filename'\n";
+
+  return scalar(<$f>);
 }
 
 sub glob {
@@ -139,6 +167,7 @@ sub tar {
 }
 
 sub uname {
+  use POSIX;
   return POSIX::uname();
 }
 

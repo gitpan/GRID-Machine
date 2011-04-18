@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 use strict;
-use Test::More tests => 3;
+use Test::More tests => 7;
 BEGIN { use_ok('GRID::Machine', qw(is_operative qc)) };
 
 my $test_exception_installed;
@@ -10,29 +10,16 @@ BEGIN {
   $test_exception_installed = 0 if $@;
 }
 
-my $machine;
-sub syntaxerr {
-  my $r;
-
-  my $p = { name => 'Peter', familyname => [ 'Smith', 'Garcia'] };
-
-  $r = $machine->eval( qc(q{ 
-      $q = shift; 
-      $q->{familyname} 
-    }), $p
-  );
-
-  die "$r" unless $r->ok;
-}
 
 my $host = $ENV{GRID_REMOTE_MACHINE};
 
 SKIP: {
-    skip "Remote not operative or Test::Exception not installed", 2
+    skip "Remote not operative or Test::Exception not installed", 6
   unless $test_exception_installed and $host and is_operative('ssh', $host);
 
 ########################################################################
 
+  my $machine;
   Test::Exception::lives_ok { 
     $machine = GRID::Machine->new(host => $host);
   } 'No fatals creating a GRID::Machine object';
@@ -40,7 +27,29 @@ SKIP: {
 ########################################################################
 
 
-Test::Exception::throws_ok { syntaxerr() } qr/Error while compiling eval.*20/, 'line number err'; # throws_ok
+  my $p = { name => 'Peter', familyname => [ 'Smith', 'Garcia'] };
+
+  my $r = $machine->eval( (q{ 
+      $q = shift; $q->{familyname} 
+    }), $p
+  );
+
+  my $expected = qr{
+      Error\s+while\s+compiling\s+eval\s+'.q\s+=\s+shift;\s+.q->.fam...'\s+
+      Global\s+symbol\s+".q"\s+requires\s+explicit\s+package\s+name\s+at\s+t/09errandlinenumbers.t\s+line\s+33,
+  }xs;
+
+  my $err = $r->errmsg;
+
+  like($err, $expected, q{Error line is pointed in eval accurately});
+
+  is($r->stdout, '', q{nothing in stdout});
+
+  is($r->errcode, 0, q{errcode is 0});
+
+  is($r->stderr, '', q{stderr is ''});
+
+  is($r->type, 'DIED', q{type is 'DIED'});
 
 } # end SKIP block
 
