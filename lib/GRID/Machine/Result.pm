@@ -1,7 +1,7 @@
 package GRID::Machine::Result;
 use List::Util qw(first);
 use overload q("") => 'str',
-             bool  => 'result';
+             bool  => 'bool';
 
 my @legal = qw(type stdout stderr results errcode errmsg);
 my %legal = map { $_ => 1 } @legal;
@@ -39,6 +39,11 @@ sub noerr {
   return (($self->{type} ne 'DIED') and  ($self->{stderr} eq ''));
 }
 
+sub bool {
+  my $self = shift;
+
+  0+$self->Results > 1 ? 1 : $self->result;
+}
 
 sub result {
   my $self = shift;

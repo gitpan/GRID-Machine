@@ -24,11 +24,11 @@ WriteMakefile(
 
 sub MY::postamble {
 
-  my $DEVELOPER = $ENV{DEVELOPER} || '';
-  return '' unless defined($DEVELOPER);
+  my $DEVELOPER = ($ENV{DEVELOPER} || '');
+  return '' unless $DEVELOPER;
 
   # To check tests in remote machines. See goal remotetest
-  my $MACHINES = $ENV{MACHINES} || '127.0.0.1 127.0.0.2';
+  my $MACHINES = ($ENV{MACHINES} || '127.0.0.1 127.0.0.2');
 
   return targets(
     MACHINES     => $MACHINES,
@@ -90,7 +90,7 @@ html: doc
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc scripts/remotetest.pl
 
 remotetest:
-	scripts/remotetest.pl ${DISTVNAME}.tar.gz <<MACHINES>>
+	perl scripts/remotetest.pl ${DISTVNAME}.tar.gz <<MACHINES>>
 
 coverage:
 	cover -delete

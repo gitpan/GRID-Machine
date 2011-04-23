@@ -3,7 +3,7 @@ use strict;
 use GRID::Machine;
 
 # test the format "machine:port" and "sshoptions" in string form
-my $host = "orion:22";
+my $host = "$ENV{GRID_REMOTE_MACHINE}:22";
 
 my $machine = GRID::Machine->new(
                 host => $host, 

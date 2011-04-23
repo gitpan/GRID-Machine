@@ -3,7 +3,7 @@
 use strict;
 my $numtests;
 BEGIN {
-$numtests = 2;
+$numtests = 3;
 }
 
 use Test::More tests => $numtests;
@@ -30,6 +30,18 @@ SKIP: {
            host       => $host,
            sshoptions => $ssh_options,
        );
-   } 'No fatals creating a GRID::Machine object';
+   } 'No fatals creating a GRID::Machine object with "-o"';
+
+# test the format "machine:port" and "sshoptions" in string form
+   
+
+   Test::Exception::lives_ok {
+       $machine = GRID::Machine->new(
+                host => $host, 
+                sshoptions => '-p 22 -X',
+                uses => [ 'Sys::Hostname' ]
+     );
+   } 'No fatals creating a GRID::Machine object with "-p 22 -X"';
+
 
 } # end SKIP block

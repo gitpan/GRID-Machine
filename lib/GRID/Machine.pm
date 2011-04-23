@@ -17,6 +17,7 @@ use File::Temp;
 use IO::File;
 use base qw(Exporter);
 use GRID::Machine::IOHandle;
+use GRID::Machine::Process;
 require POSIX;
 
 require Cwd;
@@ -28,7 +29,16 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.111";
+our $VERSION = "0.112";
+
+my %_taken_id;
+{
+  my $logic_id = 0;
+  sub new_logic_id {
+    $logic_id++ while $_taken_id{$logic_id};
+    return $logic_id++;
+  }
+}
 
 ####################################################################
 # Usage      : my $REMOTE_LIBRARY = read_modules(@Remote_modules);
@@ -208,7 +218,14 @@ EOREMOTE
 
 
      # THIS IS NEW --> LOGIC ID FOR MACHINE
-     my $logic_id = $opts{logic_id} || 0;
+     my $logic_id;
+     if ($opts{logic_id}) {
+       $logic_id = $opts{logic_id};
+       $_taken_id{$logic_id} = 1;
+     }
+     else {
+       $logic_id = new_logic_id();
+     }
      my $log = $opts{log} || '';
      my $err = $opts{err} || '';
      my $report = $opts{report} || '';
@@ -282,7 +299,7 @@ EOREMOTE
                 unless is_operative("$ssh @test_ssh_options", $host, "perl -v", $wait);
              }
 
-           my %sshoptions = @sshoptions;
+           my %sshoptions = map { $sshoptions[$_] =~ /^-[pli]$/?  @sshoptions[$_, $_+1] : () } 0..$#sshoptions;
 
            if ($sshoptions{-p}) {
              $scp .= " -P $sshoptions{'-p'}";
@@ -501,6 +518,7 @@ sub sub {
    my $self = shift;
    my $name = shift;
    my $code = shift;
+   my %args = @_;
 
    if ($code !~ /^#line \d+/m) {
      my ($package, $filename, $line) = caller;
@@ -524,12 +542,16 @@ EOCODE
    };
 
    # Install it as a singleton method of the GRID::Machine object
-   no strict 'refs'; 
-   *{$class."::$name"} = sub { 
-     my $self = shift;
+   my $sub;
+   if ($args{around}) {
+     $sub = $args{around};
+   }
+   else {
+     $sub = sub { my $self = shift; $self->call( $name, @_ ) };
+   }
 
-     $self->call( $name, @_ ) 
-   };
+   no strict 'refs'; 
+   *{$class."::$name"} = $sub;
 
    return $ok;
 }
@@ -665,7 +687,8 @@ sub slurp_file {
       my $input = slurp_file($file, 'pm');
 
       while ($input=~ m(
-                          (?:\bsub\s+([a-zA-Z_]\w*)\s*{) # 1 False } (for vi)
+                             # sub x filter y { ... }
+                          (?:\bsub\s+([a-zA-Z_]\w*)((?:\s+\#gm\s+.*)*)\s*{) # 1 False } (for vi)
                          |(__DATA__)                     # 2
                          |(__END__)                      # 3
                          |(\n=(?:head[1-4]|pod|over|begin|for)) # 4 pod
@@ -678,8 +701,8 @@ sub slurp_file {
                          |(LOCAL\s+{) # 9 False } # Execute code in the local side
                        )gx) 
       { 
-        my ($name, $data, $end, $pod, $comment, $dq, $sq, $use, $local) 
-         = ($1,    $2,    $3,   $4,   $5,       $6,  $7,  $8, $9);
+        my ($name, $filter, $data, $end, $pod, $comment, $dq, $sq, $use, $local) 
+         = ($1,    $2,      $3,    $4,   $5,   $6,       $7,  $8,  $9,   $10);
         # Finish if found __DATA__ or  __END__
         last if defined($data) or defined($end); 
 
@@ -708,7 +731,12 @@ sub slurp_file {
         my $alias = $name;
         $alias = $alias{$name} if defined($alias{$name});
         unless ($exclude{$name}) {
-          my $r = $self->sub($alias, $code);
+          my @args;
+          if ($filter) {
+            $filter  =~s/^\s*#gm //gm;
+            @args = eval $filter;
+          }
+          my $r = $self->sub($alias, $code, @args);
           $r->ok or die "Can't compile sub '$alias' in ".$self->host.":\n$r\n";
         }
       }

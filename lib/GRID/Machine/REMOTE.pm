@@ -258,15 +258,15 @@ sub read_stdfiles {
     local $/ = undef;
     my $file;
     open($file, $log) or do { 
-        $server->remotelog(qq{Can't open stdout file '$log'}); 
+        $server->remotelog(qq{Can't open stdout file '$log' $@ $!}); 
         return (); 
       };
       $rstdout = <$file>;
-    close($file) or $server->remotelog(qq{Closing stdout file '$log'});
+    close($file) or $server->remotelog(qq{Closing stdout file '$log' $@ $!});
 
-    open($file, $err) or do { $server->remotelog(qq{Can't open stderr file '$err'}); return (); };
+    open($file, $err) or do { $server->remotelog(qq{Can't open stderr file '$err' $@ $!}); return (); };
       $rstderr = <$file>;
-    close($file) or $server->remotelog(qq{Can't close stderr file '$err'}); 
+    close($file) or $server->remotelog(qq{Can't close stderr file '$err' $@ $!}); 
   }
   return ($rstdout, $rstderr);
 }
@@ -358,6 +358,10 @@ sub STORE {
   else {
     # Store a Remote Subroutine Object
     $server->{stored_procedures}{$name} = GRID::Machine::RemoteSub->new(sub => $subref, %args);
+    {
+      no strict 'refs';
+      *{'GRID::Machine::'.$name} = $subref unless GRID::Machine->can($name);
+    }
     $server->send_result( 
         results => [ 1 ],
     );

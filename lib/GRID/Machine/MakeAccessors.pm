@@ -10,10 +10,14 @@ GRID::Machine::MakeAccessors - Home Made "Make accessors" for a Class
 
 =head2 sub make_accessors
 
-   make_accessors($package, @legalattributes)
+   GRID::Machine::MakeAccessors::make_accessors($package, @legalattributes)
 
 Builds getter-setters for each attribute
 
+=head2 sub make_constructor
+
+   GRID::Machine::MakeAccessors::make_constructor($package, %legalattributes)
+   
 =cut
 
 sub make_accessors { # Install getter-setters 
@@ -28,6 +32,22 @@ sub make_accessors { # Install getter-setters
       return $self->{$sub};
     };
   }
+}
+
+sub make_constructor { # Install constructor
+  my $package = caller;
+  my %legal = @_;
+
+  no strict 'refs';
+  *{$package."::new"} = sub {
+      my $class = shift || die "Error: Provide a class\n";
+      my %args = (%legal, @_);
+
+      my $a = "";
+      die "Illegal arg  $a\n" if $a = first { !exists $legal{$_} } keys(%args);
+
+      bless \%args, $class;
+  };
 }
 
 1;

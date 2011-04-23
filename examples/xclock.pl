@@ -3,9 +3,9 @@ use strict;
 use GRID::Machine qw(is_operative);
 use Data::Dumper;
 
-my $host = 'casiano@orion.pcg.ull.es';
+my $host = $ENV{GRID_REMOTE_MACHINE};
 
-my $machine = GRID::Machine->new(host => $host, ssh => 'ssh -X');
+my $machine = GRID::Machine->new(host => $host, sshoptions => '-X');
 
-print $machine->eval(q{ system('xclock') });
+print Dumper($machine->eval(q{ CORE::system('xclock') }));
 

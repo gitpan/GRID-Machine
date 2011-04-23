@@ -2,7 +2,7 @@
 use strict;
 use GRID::Machine;
 
-my $host = $ENV{GRID_REMOTE_MACHINE} || 'casiano@orion.pcg.ull.es';
+my $host = $ENV{GRID_REMOTE_MACHINE};
 
 my $machine = GRID::Machine->new(host => $host,);
 

@@ -5,6 +5,11 @@ use File::Spec;
 
 sub getcwd { return getcwd() }
 
+sub getpid #gm ( filter => 'result')
+{
+  $$;
+}
+
 sub chdir  { 
  my $dir = shift || $ENV{HOME};
  return chdir($dir) 
@@ -112,17 +117,54 @@ sub qqx {
   scalar(`$program`);
 }
 
-sub fork {
+sub fork 
+#gm (filter => 'result', 
+#gm  around => sub { my $self = shift; my $r = $self->call( 'fork', @_ ); $r->{machine} = $self; $r }
+#gm ) 
+{
   my $childcode = shift;
-  my %args = (stdin => '/dev/null', stdout => '/dev/null', stderr => '/dev/null', @_);
+  my %args = (stdin => '/dev/null', stdout => '', stderr => '', result => '', args => [], @_);
 
+  my ($stdin, $stdout, $stderr, $result) = @args{'stdin', 'stdout', 'stderr', 'result'};
+
+  $| = 1;
+
+  use File::Temp qw{tempfile};
+
+  unless ($stdout) {
+    my $stdoutfile;
+    ($stdoutfile, $stdout) = tempfile(SERVER()->{tmpdir}.'/GMFORKXXXXXX', UNLINK => 0, SUFFIX =>'.out');
+    close($stdoutfile);
+  }
+
+  unless ($stderr) {
+    my $stderrfile;
+    ($stderrfile, $stderr) = tempfile(SERVER()->{tmpdir}.'/GMFORKXXXXXX', UNLINK => 0, SUFFIX =>'.err');
+    close($stderrfile);
+  }
+
+  unless ($result) {
+    my $resultfile;
+    ($resultfile, $result) = tempfile(SERVER()->{tmpdir}.'/GMFORKXXXXXX', UNLINK => 0, SUFFIX =>'.result');
+    close($resultfile);
+  }
 
   my $pid = fork;
   unless (defined($pid)) {
-    SERVER->remotelog("$$ Can't fork\n"); 
+    SERVER->remotelog("Process $$: Can't fork '".substr($childcode,0,10)."'\n$@ $!"); 
     return undef;
   }
-  return $pid if ($pid);
+
+  if ($pid) { # father
+    #gprint("Created child $pid\n");
+    return bless { 
+             pid    => $pid, 
+             stdin  => $stdin, 
+             stdout => $stdout, 
+             stderr => $stderr, 
+             result => $result 
+           }, 'GRID::Machine::Process';
+  }
 
   # child
 
@@ -131,16 +173,109 @@ use strict;
 sub { 
     use POSIX qw{setsid};
     setsid(); 
-    open(STDIN, "< $args{stdin}");
-    open(STDOUT,"> $args{stdout}");
-    open(STDERR,"> $args{stderr}");
+    open(STDIN, "< $stdin");
+    open(STDOUT,"> $stdout");
+    open(STDERR,"> $stderr");
 
   $childcode 
 };
 EOSUB
-  $subref->(@_);
+  SERVER->remotelog("Found errors while forking in code '".substr($childcode,0,10)."'\n$@\n") if $@;
+
+    # admit a single argument of any kind
+    my $ar =  $args{args};
+    $ar = [ $ar ] unless reftype($ar) and (reftype($ar) eq 'ARRAY');
+
+    my @r = $subref->(@$ar);
+
+    close(STDERR);
+    close(STDOUT);
+
+    use Data::Dumper;
+    local $Data::Dumper::Indent = 0;
+    local $Data::Dumper::Deparse = 1;
+    local $Data::Dumper::Purity = 1;
+    local $Data::Dumper::Terse = 0;
+
+    open(my $resfile, ">", $result);
+    print $resfile Dumper([\@r, \$@]);
+    close($resfile);
+
   exit(0);
 }
+
+sub waitpid #gm (filter => 'result')
+{
+  my $process = shift;
+
+  $process = $process->result if ($process->isa('GRID::Machine::Result'));
+
+  SERVER->remotelog(Dumper($process));
+  #gprint("Synchronizing with $process->{pid} args = <@_>\n");
+
+  my ($status, $deceased);;
+  do {
+    $deceased = waitpid($process->{pid}, @_ ? @_ : 0);
+    $status = $?;
+
+    #gprint("Synchronized: Pid of the deceased process: $deceased\n");
+    #gprint("there are processes still running\n") if (!$deceased);
+
+    #SERVER->remotelog("deceased = $deceased");
+
+    #if (kill 0, -$process->{pid}) { gprint("Not answer to 0 signal from process $process->{pid}\n") }
+    #else { gprint("Strange: the process $process->{pid} is still alive\n"); }
+
+  } while (kill 0, -$process->{pid});
+
+  # if deceased is 0
+  # TODO: study flock, may be this way we can synchronize!!
+  local $/ = undef;
+  open my $fo, $process->{stdout}; # check exists, die, etc.
+    my $stdout = <$fo>;
+  close($fo);
+  CORE::unlink $process->{stdout};
+
+  #gprint("stderr file is: $process->{stderr}\n");
+  open my $fe, $process->{stderr}; # or do { SERVER->remotelog("can't open file <$process->{stderr}> $@") }; # check exists, die, etc.
+    my $stderr = <$fe>;
+  #gprint("stderr is: $stderr\n");
+  close($fe);
+  CORE::unlink $process->{stderr};
+
+  open my $fr, $process->{result} or do { SERVER->remotelog("can't open file <$process->{stderr}> $@") }; # check exists, die, etc.
+    #sleep 1;
+    my $result = <$fr>;
+    #gprint("result as read from file $process->{result} is  <$result>\n");;
+  close($fr);
+  CORE::unlink $process->{result};
+
+  $result .= '$VAR1';
+  my $val  = eval "no strict; $result";
+  #SERVER->remotelog("Errors: '$@'. Result from the asynchronous call: '@$val'");
+  
+  return bless {
+    stdout  => $stdout, 
+    stderr  => $stderr, 
+    results => $val->[0], 
+    status  => $status,    # as in $?
+    waitpid => $deceased,  # returned by waitpid
+    descriptor => SERVER()->host().':'.$$.':'.$process->{pid},
+    machineID  => SERVER()->logic_id,
+    errmsg  => ${$val->[1]},  # as $@
+  }, 'GRID::Machine::Process::Result';
+}
+
+sub kill { #gm (filter => 'result')
+  my $signal = shift;
+
+  CORE::kill $signal, @_;
+}
+
+sub poll { #gm (filter => 'result')
+  CORE::kill 0, @_;
+}
+
 
 sub slurp {
   my $filename = shift;

@@ -379,6 +379,31 @@ file:
  # to local host
  NoHostAuthenticationForLocalhost yes
 
+=item * logic_id
+
+An integer. Contains the logical identifier associated with the L<GRID::Machine>.
+By default, 0 if it was the first L<GRID::Machine> created, 1 if it was the second, etc.
+See an example:
+
+  $ cat -n logic_id.pl 
+       1  #!/usr/bin/perl -w
+       2  use strict;
+       3  use GRID::Machine;
+       4  
+       5  my $m1 = GRID::Machine->new( host => shift());
+       6  my $m2 = GRID::Machine->new( host => shift());
+       7  my $m3 = GRID::Machine->new( host => shift());
+       8  
+       9  print $m1->logic_id."\n";
+      10  print $m2->logic_id."\n";
+      11  print $m3->logic_id."\n";
+
+the execution produces the following output:
+
+  $ ./logic_id.pl machine othermachine somemachine
+  0
+  1
+  2
 
 =item * log
 
@@ -1147,10 +1172,19 @@ When executed, the former program produces this output:
 
 Syntax:
 
-                    $machine->sub( $name, $code )
-                    $machine->sub( $name, $code, politely => $politely )
-                    $machine->sub( $name, $code, filter => $filter )
-                    $machine->sub( $name, $code, filter => $filter, politely => $politely )
+                    $machine->sub( $name, $code, %args )
+
+Valid arguments (C<%args>) are::
+
+=over 2
+
+=item *  C<politely =E<gt> $politely>
+
+=item *  C<filter =E<gt> $filter>
+                    
+=item *  C<around =E<gt> sub { ... }>
+
+=back
 
 This method is identical to the C<compile> method, except that the remote
 C<$code> will be available as a (singleton) 
@@ -1158,7 +1192,35 @@ method of the C<$machine> object within the local perl
 program. Therefore, two methods of two different C<GRID::Machine> objects with
 the same C<$name> are installed on different name spaces. See the example
 in section
-L<The Constructor new>
+L<The Constructor new>.
+
+The installed method C<$name> can also be accessed as an ordinary function C<$name>
+on the remote side.
+See the call to function C<hi> at line 15 in this  example:
+
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  
+     5  my $host = $ENV{GRID_REMOTE_MACHINE}; 
+     6  my $debug = @ARGV ? 1234 : 0;
+     7  
+     8  my $machine = GRID::Machine->new(host => $host, debug => $debug);
+     9  
+    10  $machine->sub( hi => q{ my $n = shift; "Hello $n\n"; } );
+    11  
+    12  print $machine->hi('Jane')->result;
+    13  
+    14  # same thing
+    15  print $machine->eval(q{ hi(shift()) }, 'Jane')->result;
+
+The execution produces the following output:
+
+  $ perl subfromserver.pl 
+  Hello Jane
+  Hello Jane
+
+  
 
 =head3 The C<filter> Argument
 
@@ -1221,11 +1283,52 @@ In general, the result of a call to a subroutine installed using
 
 will apply the C<$filter> subroutine to the C<GRID::Machine::Result> object resulting
 from the call. The filter C<$filter> must be a C<GRID::Machine::Result> method
-and must return a scalar.
+and must return a scalar. The filter is executed in the remote side of the L<GRID::Machine>.
 
 The usage of the C<results> and C<result> filters can be convenient
 when the programmer isn't interested in the other attributes i.e. C<stdout>, 
 C<stderr>, etc.
+
+=head3 The C<around> argument
+
+A C<CODE> reference. By default L<GRID::Machine> produces a proxy representative in the local 
+side for the C<sub> being installed. The code of the proxy simply calls 
+the corresponding C<sub> in the remote side:
+
+      sub { my $self = shift; $self->call( $name, @_ ) };
+
+You can substitute the proxy code by your own code using the C<around> parameter.
+The proxy code receives the L<GRID::Machine> object and the arguments
+for the remote side of the subroutine.
+See the following example:
+
+  $ cat around.pl 
+  #!/usr/bin/perl -w
+  use strict;
+  use GRID::Machine;
+
+  my $machine = GRID::Machine->new( host => $ENV{GRID_REMOTE_MACHINE} || shift);
+
+  $machine->sub( 
+    squares => q{ map { $_*$_ } @_ },
+    filter => 'results',
+    around => sub { 
+                my $self = shift; 
+                my $r = $self->call( 'squares', @_ ); 
+                map { $_+1 } @$r; 
+              }
+  );
+
+  my @x = (3..5);
+  my @r = $machine->squares(@x);
+  print "@r\n";
+
+When called, the C<squares> function computes the squares on the remote side
+and adds one to each element in the local side:
+
+  $ perl around.pl
+  10 17 26
+
 
 =head2 The C<call> Method
 
@@ -1851,6 +1954,83 @@ When executed the program produces an output like:
   user@remote.machine.es->t( include4.pl ) = <>
   user@remote.machine.es->f( include4.pl ) = <1>
   user@remote.machine.es->d( include4.pl ) = <>
+
+=head3 Specifying filters and proxys via C<#gm>
+
+We can include comments C<grid machine comments> between 
+the name of the subroutine and the open curly bracket
+to specify the options for the C<sub> installation.
+The comments must start with C<#gm >. See an example:
+
+  $ cat -n Include6.pm 
+     1  use strict;
+     2  
+     3  sub last 
+     4  #gm (filter => 'result', ) 
+     5  {
+     6    $_[-1] 
+     7  }
+     8  
+     9  sub LASTitem 
+    10  {
+    11    $_[-1] 
+    12  }
+    13  
+    14  sub one 
+    15  #gm (
+    16  #gm   filter => 'result', 
+    17  #gm   around => sub { 
+    18  #gm     my $self = shift; 
+    19  #gm     my $r = $self->call( 'one', @_ ); 
+    20  #gm     use Sys::Hostname;
+    21  #gm     $r."Local machine: ".hostname()."\n" 
+    22  #gm   },
+    23  #gm )
+    24  {
+    25    SERVER->host." received: <@_>\n";
+    26  }
+
+Sub C<last> will return just the C<result> instead of the 
+full L<GRID::Machine::Result> object.
+We have also substituted the proxy representative of
+method C<one> using the C<around> parameter.
+Consider the following script example:
+
+  $ cat -n include6.pl 
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  use Data::Dumper;
+     5  
+     6  my $host = $ENV{GRID_REMOTE_MACHINE};
+     7  
+     8  my $machine = GRID::Machine->new( host => $host);
+     9  
+    10  $machine->include("Include6");
+    11  
+    12  print $machine->last(4..9)."\n";
+    13  
+    14  my $r = $machine->LASTitem(4..9);
+    15  print Dumper($r);
+    16  
+    17  print $machine->one(4..9)."\n";
+
+when executed, produces:
+
+  $ perl include6.pl 
+  9
+  $VAR1 = bless( {
+                   'stderr' => '',
+                   'errmsg' => '',
+                   'type' => 'RETURNED',
+                   'stdout' => '',
+                   'errcode' => 0,
+                   'results' => [
+                                  9
+                                ]
+                 }, 'GRID::Machine::Result' );
+  some.machine received: <4 5 6 7 8 9>
+  Local machine: my.local.machine
 
 =head1 THE C<GRID::Machine::Core> REMOTE MODULE
 
@@ -2764,6 +2944,174 @@ When executed, the former program produces an output like this:
 
 
 
+=head1 REMOTE PROCESSES (FORKING)
+
+
+=head2 The C<fork> method
+
+The C<fork> method of C<GRID::Machine> objects can be used to fork a process in the remote machine,
+as shown in the following example:
+
+  $ cat -n fork5.pl 
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  use Data::Dumper;
+     5  
+     6  my $host = $ENV{GRID_REMOTE_MACHINE};
+     7  my $machine = GRID::Machine->new( host => $host );
+     8  
+     9  my $p = $machine->fork( q{
+    10  
+    11     print "stdout: Hello from process $$. args = (@_)\n";
+    12     print STDERR "stderr: Hello from process $$\n";
+    13  
+    14     use List::Util qw{sum};
+    15     return { s => sum(@_), args => [ @_ ] };
+    16   },
+    17   args => [ 1..4 ],
+    18  );
+    19  
+    20  # GRID::Machine::Process objects are overloaded
+    21  print "Doing something while $p is still alive  ...\n" if $p; 
+    22  
+    23  my $r = $machine->waitpid($p);
+    24  
+    25  print "Result from process '$p': ",Dumper($r),"\n";
+    26  print "GRID::Machine::Process::Result objects are overloaded in a string context:\n$r\n";
+
+
+When executed, the former program produces an output similar to this:
+
+  $ perl fork5.pl 
+  Doing something while 5220:5230:some.machine:5234:5237 is still alive  ...
+  Result from process '5220:5230:some.machine:5234:5237': $VAR1 = bless( {
+                   'machineID' => 0,
+                   'stderr' => 'stderr: Hello from process 5237
+  ',
+                   'descriptor' => 'some.machine:5234:5237',
+                   'status' => 0,
+                   'waitpid' => 5237,
+                   'errmsg' => '',
+                   'stdout' => 'stdout: Hello from process 5237. args = (1 2 3 4)
+  ',
+                   'results' => [ { 'args' => [ 1, 2, 3, 4 ], 's' => 10 } ]
+                 }, 'GRID::Machine::Process::Result' );
+
+  GRID::Machine::Process::Result objects are overloaded in a string context:
+  stdout: Hello from process 5237. args = (1 2 3 4)
+  stderr: Hello from process 5237
+
+
+The C<fork> method returns a L<GRID::Machine::Process> object. The first argument must be a string containing
+the code that will be executed by the forked process in the remote machine.
+Such code is always called in a list context.
+The C<fork> method admits the following arguments:
+
+=over 2
+
+=item * C<stdin>
+
+The name of the file to which C<stdin> will be redirected
+
+=item * C<stdout>
+
+The name of the file to which C<stdout> will be redirected. If not specified a temporary file will be used
+
+=item * C<stderr>
+
+The name of the file to which C<stderr> will be redirected. If not specified a temporary file will be used
+
+=item * C<result>
+
+The name of the file to which the result computed by the child process  will be dumped. If not specified a temporary file will be used
+
+=item * C<args>
+
+The arguments for the code executed by the remote child process
+
+=back
+
+=head3 C<GRID::Machine::Process> objects
+
+L<GRID::Machine::Process> objects have been overloaded. In a string context 
+a L<GRID::Machine::Process> object 
+produces the concatenation C<hostname:clientPID:remotePID>. 
+In a boolean context it returns true if the process is alive and false otherwise.
+This way, the execution of line 21 in the program above:
+
+    21  print "Doing something while $p is still alive  ...\n" if $p; 
+
+produces an output like:
+
+  Doing something while 5220:5230:some.machine:5234:5237 is still alive  ...
+
+if the remote process is still alive. The descriptor of the process
+C<5220:5230:some.machine:5234:5237>
+is a colon separated sequence of five components:
+
+=over 2
+
+=item 1 - The PID of the local process executing L<GRID::Machine> 
+
+=item 2 - The PID of the local process in charge of the connection with the remote 
+machine
+
+=item 3 - The name of the remote machine 
+
+=item 4 - The PID of the remote process executing L<GRID::Machine::REMOTE>
+
+=item 5 - The PID of the child process created by C<fork>
+
+=back
+
+When evaluated in a boolean context, a L<GRID::Machine::Process> returns
+1 if it is alive and 0 otherwise.
+
+=head3 The C<waitpid> method
+
+The C<waitpid> method  waits for the L<GRID::Machine::Process> received as first argument 
+to terminate.  It returns a L<GRID::Machine::Process::Result> object, whose attributes contain:
+
+
+=over 2 
+
+=item * C<stdout>  
+
+A string containing the output to C<STDOUT> of the remote child process
+
+=item * C<stderr>
+
+A string containing the output to C<STDERR> of the remote child process
+
+=item * C<results>
+
+The list of values returned by the child process. The forking code 
+is always called in a list context.
+
+=item * C<status>
+
+The value associated with C<$?> as returned by the remote child process.
+
+=item * C<waitpid>
+
+The value returned by the Perl C<waitpid> function when synchronized 
+with the remote child process.
+It is usually the value is either the C<pid> of the deceased process, or C<-1> 
+if there was no such child process.  On some systems, a value of C<0> indicates that
+there are processes still running.  
+
+=item * C<errmsg> 
+
+The child error as in C<$@> 
+
+=item * C<machineID>
+
+The logical identifier of the associated L<GRID::Machine>.
+By default, 0 if it was the first L<GRID::Machine> created, 1 if it was the second, etc.
+
+=back 
+
 
 =head1 CALLBACKS
 
@@ -3140,7 +3488,8 @@ C<stored_procedures> of the C<SERVER> object:
                     SERVER->stored_procedures->{subname}
 
 =item * C<use Module> declarations. The C<Module> must exists in the remote
-server
+server. Furthermote module import arguments as in C<use Module qw{ w1 w2 w3}> must be
+in a single line.
 
 =item * POD documentation
 

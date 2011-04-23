@@ -1,8 +1,38 @@
+
+* make the serializer an option: Data::Dumper, Storable, etc.
+
+* Add GRID::Cluster pki to GRID::Machine
+
+* fork: document
+    start, poll, wait, kill, exit_status, kill_on_destruction??
+    arguments to the fork subroutine?
+    fork is the constructor ?
+    Create the class GRID::Machine::Process
+                               machine
+                               PID
+                               stdin
+                               stdout
+                               stderr
+                               terminal?
+
+* Documentation: 
+    'around'  parameter in sub: make a customized proxy
+
+* Optimization: make method "subs" that will install a set of metods (alternative to 'include')
+  use it to install Core, RIOHandlers, etc.
+
+* make an alias of stored subs (DONE)
+
+    *GRID::Machine::subname = \&SERVER()->{stored_procedures}{subname}{sub}
+
+ We need some sort of namespaces.!!!! (NOT DONE)
+
+* Set filter in sub wait
 * Add to "sub include" the parsing of attributes as:
+    - "filter" Filter output
     - compute line number, set it in sub call
     - transfer file if debugging
     - "context" (send the context scalar/list to the remote sub
-    - "filter" Filter output
 
 * a handler for CTRL-C that removes the temporary files and kills the remote
 
@@ -17,16 +47,6 @@
   para tener un autentico fichero de log
   Reutilizo setloganderr. El usuario puede definirlo
 
-* fork: document
-    start, poll, wait, kill, exit_status
-    fork is the constructor ?
-    Create the class GRID::Machine::Process
-                               machine
-                               PID
-                               stdin
-                               stdout
-                               stderr
-                               terminal?
 
 * make a test for gdb without netcat listening
 * finish gmdb
