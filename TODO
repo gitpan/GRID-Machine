@@ -1,3 +1,12 @@
+* Writing makemethod: make a proxy for an existing sub
+   - factorize
+   - documentation
+   - tests
+
+* allow the user to load remote modules at bootstrap
+  in new: bootstrapmodules => ...
+
+* document method putstringcode
 
 * make the serializer an option: Data::Dumper, Storable, etc.
 
@@ -7,15 +16,9 @@
     start, poll, wait, kill, exit_status, kill_on_destruction??
     arguments to the fork subroutine?
     fork is the constructor ?
-    Create the class GRID::Machine::Process
-                               machine
-                               PID
-                               stdin
-                               stdout
-                               stderr
-                               terminal?
 
 * Documentation: 
+    GRID::Machine::Process
     'around'  parameter in sub: make a customized proxy
 
 * Optimization: make method "subs" that will install a set of metods (alternative to 'include')

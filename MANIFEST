@@ -111,6 +111,8 @@ examples/local.preamble.pl
 examples/logerr.pl
 examples/logic_id.pl
 examples/m.pl
+examples/makemethod.pl
+examples/makemethod1.pl
 examples/manni.pl
 examples/manycalls.pl
 examples/manycallsoutput.pl
@@ -208,5 +210,8 @@ examples/vars4.pl
 examples/vars5.pl
 examples/vars6.pl
 examples/version.pl
+examples/wait1.pl
+examples/wait2.pl
+examples/waitpi.pl
 examples/xclock.pl
 META.yml                                 Module meta-data (added by MakeMaker)

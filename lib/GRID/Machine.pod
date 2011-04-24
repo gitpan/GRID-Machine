@@ -1195,7 +1195,7 @@ in section
 L<The Constructor new>.
 
 The installed method C<$name> can also be accessed as an ordinary function C<$name>
-on the remote side.
+on the remote side. If a function with the same name already exists, the oldest prevails.
 See the call to function C<hi> at line 15 in this  example:
 
      1  #!/usr/bin/perl -w
@@ -1329,6 +1329,59 @@ and adds one to each element in the local side:
   $ perl around.pl
   10 17 26
 
+=head2 The C<makemethod> Method
+
+Syntax:
+
+                    $machine->makemethod( $name, %args )
+
+Valid arguments (C<%args>) are::
+
+=over 2
+
+=item *  C<politely =E<gt> $politely>
+
+=item *  C<filter =E<gt> $filter>
+                    
+=item *  C<around =E<gt> sub { ... }>
+
+=back
+
+This method is identical to the C<sub> method, 
+except that it assumes the sub C<$name> has 
+been already installed in the remote side.
+The C<$name>  can be a fully qualified name,
+but the method call must use the short name.
+The following example produces a proxy method for the 
+function C<reduce> which is already available 
+at the remote machine:
+
+  $ cat -n makemethod.pl 
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  
+     5  my $host = shift || $ENV{GRID_REMOTE_MACHINE};
+     6  
+     7  my $m = GRID::Machine->new(host => $host, uses => [q{List::Util qw{reduce}}]);
+     8  
+     9  $m->makemethod( 'reduce', filter => 'result' );
+    10  my $r = $m->reduce(sub { $a > $b ? $a : $b }, (7,6,5,12,1,9));
+    11  print "\$r =  $r\n";
+    12  
+    13  my $m2 = GRID::Machine->new(host => $host, uses => [q{List::Util}]);
+    14  
+    15  $m2->makemethod( 'List::Util::reduce' );
+    16  $r = $m2->reduce(sub { $a > $b ? $a : $b }, (7,6,5,12,1,9));
+    17  die $r->errmsg unless $r->ok;
+    18  print "\$r =  ".$r->result."\n";
+
+The execution produces:
+
+  $ perl -w makemethod.pl 
+  $r =  12
+  $r =  12
+
 
 =head2 The C<call> Method
 
@@ -1339,6 +1392,25 @@ Syntax:
 This method invokes a remote method that has earlier been defined using the
 C<compile> or C<sub> methods. The arguments are passed and the result is
 returned in the same way as with the C<eval> method.
+
+=head2 The C<makemethods> Method
+
+Convenience method to install several methods in a row. The following call installs
+methods C<fork>, C<waitpid>, C<kill> and C<poll>:
+
+     $self->makemethods(
+        [ 'fork', filter=>'result',
+           around => sub { 
+              my $self = shift; 
+              my $r = $self->call( 'fork', @_ ); 
+              $r->{machine} = $self; 
+              $r 
+           },
+         ],
+         [ 'waitpid', filter=>'result', ],
+         [ 'kill', filter=>'result', ],
+         [ 'poll', filter=>'result', ],
+     );
 
 
 =head2 Nested Structures
@@ -3032,7 +3104,7 @@ The arguments for the code executed by the remote child process
 
 =back
 
-=head3 C<GRID::Machine::Process> objects
+=head2 C<GRID::Machine::Process> objects
 
 L<GRID::Machine::Process> objects have been overloaded. In a string context 
 a L<GRID::Machine::Process> object 
@@ -3068,10 +3140,11 @@ machine
 When evaluated in a boolean context, a L<GRID::Machine::Process> returns
 1 if it is alive and 0 otherwise.
 
-=head3 The C<waitpid> method
+=head2 The C<waitpid> method
 
 The C<waitpid> method  waits for the L<GRID::Machine::Process> received as first argument 
-to terminate.  It returns a L<GRID::Machine::Process::Result> object, whose attributes contain:
+to terminate. Additional C<FLAGS> as in perl C<waitpid> can be passed as arguments.
+It returns a L<GRID::Machine::Process::Result> object, whose attributes contain:
 
 
 =over 2 
@@ -3111,6 +3184,120 @@ The logical identifier of the associated L<GRID::Machine>.
 By default, 0 if it was the first L<GRID::Machine> created, 1 if it was the second, etc.
 
 =back 
+
+=head2  The C<waitall> method
+
+It is similar to C<waitpid> but instead waits for any child process.
+
+Behaves like the wait(2) system call on your system: it waits
+for a child process to terminate and returns 
+
+=over 2
+
+=item * The C<GRID::Machine::Process::Result>
+object associated with the  deceased process if it was called via the L<GRID::Machine> 
+C<fork> method, or 
+
+=item * The PID of the deceased process if there is no C<GRID::Machine::Process>
+associated (it was called using an ordinary C<fork>)
+
+=item * C<-1> if there are no child processes.  
+Note that a return value of C<-1> could mean that child processes are
+being automatically reaped, as described in perlipc.
+
+=back
+
+See an example:
+
+  $ cat -n wait1.pl 
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  use Data::Dumper;
+     5  
+     6  my $host = $ENV{GRID_REMOTE_MACHINE};
+     7  my $machine = GRID::Machine->new( host => $host );
+     8  
+     9  my $p = $machine->fork( q{
+    10  
+    11     print "stdout: Hello from process $$. args = (@_)\n";
+    12     print STDERR "stderr: Hello from process $$\n";
+    13  
+    14     use List::Util qw{sum};
+    15     return { s => sum(@_), args => [ @_ ] };
+    16   },
+    17   args => [ 1..4 ],
+    18  );
+    19  
+    20  # GRID::Machine::Process objects are overloaded
+    21  print "Doing something while $p is still alive  ...\n" if $p; 
+    22  
+    23  my $r = $machine->waitall();
+    24  
+    25  print "Result from process '$p': ",Dumper($r),"\n";
+    26  print "GRID::Machine::Process::Result objects are overloaded in a string context:\n$r\n";
+
+When executed produces:
+
+  $ perl wait1.pl 
+  Doing something while 1271:1280:local:1284:1287 is still alive  ...
+  Result from process '1271:1280:local:1284:1287': $VAR1 = bless( {
+                   'machineID' => 0,
+                   'stderr' => 'stderr: Hello from process 1287
+  ',
+                   'descriptor' => 'local:1284:1287',
+                   'status' => 0,
+                   'waitpid' => 1287,
+                   'errmsg' => '',
+                   'stdout' => 'stdout: Hello from process 1287. args = (1 2 3 4)
+  ',
+                   'results' => [ { 'args' => [ 1, 2, 3, 4 ], 's' => 10 } ]
+                 }, 'GRID::Machine::Process::Result' );
+
+GRID::Machine::Process::Result objects are overloaded in a string context:
+stdout: Hello from process 1287. args = (1 2 3 4)
+stderr: Hello from process 1287
+
+The following example uses the C<fork> method and C<waitall> to 
+compute in parallel a numerical approach to the value of the number C<pi>:
+
+  $ cat -n waitpi.pl 
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  
+     5  my $host = $ENV{GRID_REMOTE_MACHINE};
+     6  my $machine = GRID::Machine->new( host => $host );
+     7  
+     8  my ($N, $np, $pi)  = (1000, 4, 0);
+     9  for (0..$np-1) {
+    10     $machine->fork( q{
+    11         my ($id, $N, $np) = @_;
+    12           
+    13         my $sum = 0;
+    14         for (my $i = $id; $i < $N; $i += $np) {
+    15             my $x = ($i + 0.5) / $N;
+    16             $sum += 4 / (1 + $x * $x);
+    17         }
+    18         $sum /= $N; 
+    19      },
+    20      args => [ $_, $N, $np ],
+    21    );
+    22  }
+    23  
+    24  $pi += $machine->waitall()->result for 1..$np;
+    25  
+    26  print "pi = $pi\n";
+
+
+=head2 GRID::Machine::Process::Result objects
+
+In a string context a C<GRID::Machine::Process::Result> object produces the concatenation
+of its output to C<STDOUT> followed by its output to C<STDERR>.
+In a boolean context it evaluates according to its C<result> attribute.
+It evaluates to true if it is an array reference with more than one element
+or if the only element is true. Otherwise it is false.
+
 
 
 =head1 CALLBACKS

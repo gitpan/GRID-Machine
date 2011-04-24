@@ -1,10 +1,10 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 use strict;
 use GRID::Machine;
 use PDL;
 use PDL::IO::Dumper;
 
-my $host = shift || 'casiano@beowulf.pcg.ull.es';
+my $host = shift || $ENV{GRID_REMOTE_MACHINE};
 
 my $machine = GRID::Machine->new(host => $host, uses => [qw(PDL PDL::IO::Dumper)]);
 

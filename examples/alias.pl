@@ -2,7 +2,8 @@
 use strict;
 use GRID::Machine qw(qc);
 
-my $machine = GRID::Machine->new(host => shift(), uses => [ 'Sys::Hostname' ]);
+my $host = $ENV{GRID_REMOTE_MACHINE};
+my $machine = GRID::Machine->new(host => $host, uses => [ 'Sys::Hostname' ]);
 
 my $r = $machine->sub( iguales => qc q{
     my ($first, $sec) = @_;

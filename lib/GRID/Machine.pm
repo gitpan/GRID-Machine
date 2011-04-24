@@ -29,7 +29,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.112";
+our $VERSION = "0.113";
 
 my %_taken_id;
 {
@@ -446,6 +446,21 @@ HELPMSG
      $self->include('GRID::Machine::Core');
      $self->include('GRID::Machine::RIOHandle');
 
+     $self->makemethods(
+         [ 'fork',    filter=>'result',
+            around => sub { 
+              my $self = shift; 
+              my $r = $self->call( 'fork', @_ ); 
+              $r->{machine} = $self; 
+              $r 
+            },
+         ],
+         [ 'waitpid', filter=>'result', ],
+         [ 'waitall', filter=>'result', ],
+         [ 'kill',    filter=>'result', ],
+         [ 'poll',    filter=>'result', ],
+     );
+
      my $includes = $opts{includes} || [];
      die "Arg 'includes' of new must be an ARRAY ref\n" unless reftype($includes) eq 'ARRAY';
      $self->include($_) for @$includes;
@@ -554,6 +569,41 @@ EOCODE
    *{$class."::$name"} = $sub;
 
    return $ok;
+}
+
+sub makemethod {
+   my $self = shift;
+   my $name = shift;
+   my %args = @_;
+
+   my ($rpackage, $rname) = $name =~ m{(.*)\b(\w+)$};
+   # Don't overwrite existing methods 
+   my $class = ref($self);
+   warn "Machine ".$self->host ." already has a method $rname." if $class->can($rname);
+
+   $self->send_operation( "GRID::Machine::MAKEMETHOD", $name, @_ );
+
+   my $ok = $self->_get_result( );
+   return $ok if (blessed($ok) && $ok->type eq 'DIED');
+
+   # Install it as a singleton method of the GRID::Machine object
+   my $sub;
+   if ($args{around}) {
+     $sub = $args{around};
+   }
+   else {
+     $sub = sub { my $self = shift; $self->call( $name, @_ ) };
+   }
+
+   no strict 'refs'; 
+   *{$class."::$rname"} = $sub;
+
+}
+
+sub makemethods {
+   my $self = shift;
+
+   $self->makemethod(@$_) for @_;
 }
 
 # -dk- modified by Casiano
