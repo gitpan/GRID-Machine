@@ -29,7 +29,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.113";
+our $VERSION = "0.114";
 
 my %_taken_id;
 {
@@ -451,6 +451,14 @@ HELPMSG
             around => sub { 
               my $self = shift; 
               my $r = $self->call( 'fork', @_ ); 
+              $r->{machine} = $self; 
+              $r 
+            },
+         ],
+         [ 'async',   filter=>'result',
+            around => sub { 
+              my $self = shift; 
+              my $r = $self->call( 'async', @_ ); 
               $r->{machine} = $self; 
               $r 
             },

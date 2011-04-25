@@ -3254,9 +3254,9 @@ When executed produces:
                    'results' => [ { 'args' => [ 1, 2, 3, 4 ], 's' => 10 } ]
                  }, 'GRID::Machine::Process::Result' );
 
-GRID::Machine::Process::Result objects are overloaded in a string context:
-stdout: Hello from process 1287. args = (1 2 3 4)
-stderr: Hello from process 1287
+  GRID::Machine::Process::Result objects are overloaded in a string context:
+  stdout: Hello from process 1287. args = (1 2 3 4)
+  stderr: Hello from process 1287
 
 The following example uses the C<fork> method and C<waitall> to 
 compute in parallel a numerical approach to the value of the number C<pi>:
@@ -3288,6 +3288,52 @@ compute in parallel a numerical approach to the value of the number C<pi>:
     24  $pi += $machine->waitall()->result for 1..$np;
     25  
     26  print "pi = $pi\n";
+
+=head2  The C<async> method
+
+The C<async> method it is quite similar to the fork method
+but receives as arguments the  name of a L<GRID::Machine> method 
+and the arguments for this method.
+It executes asynchronously the method. 
+It returns a L<GRID::Machine::Process> object.
+Basically, the call
+
+            $m->async($subname => @args) 
+
+is equivalent to:
+
+            $m->fork($subname.'(@_)' args => [ @args ] ) 
+
+The following example uses C<async> to compute in 
+parallel an approximation to the value of pi:
+
+
+  $ cat -n async.pl 
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  
+     5  my $host = $ENV{GRID_REMOTE_MACHINE};
+     6  my $machine = GRID::Machine->new( host => $host );
+     7  
+     8  $machine->sub(sumareas => q{
+     9         my ($id, $N, $np) = @_;
+    10           
+    11         my $sum = 0;
+    12         for (my $i = $id; $i < $N; $i += $np) {
+    13             my $x = ($i + 0.5) / $N;
+    14             $sum += 4 / (1 + $x * $x);
+    15         }
+    16         $sum /= $N; 
+    17  });
+    18  
+    19  my ($N, $np, $pi)  = (1000, 4, 0);
+    20  
+    21  $machine->async( sumareas =>  $_, $N, $np ) for (0..$np-1);
+    22  $pi += $machine->waitall()->result for 1..$np;
+    23  
+    24  print "pi = $pi\n";
+
 
 
 =head2 GRID::Machine::Process::Result objects

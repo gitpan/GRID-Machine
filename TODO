@@ -1,3 +1,7 @@
+* I'm trying to see how IPC::PerlSSH behaves in case the underlying ssh connection gets disconnected.
+  http://www.perlmonks.org/?node_id=792383
+* Add a parameter 'modputs' or s.t. like that to the constructor
+
 * Writing makemethod: make a proxy for an existing sub
    - factorize
    - documentation

@@ -748,6 +748,14 @@ EOSUB
   exit(0);
 }
 
+sub async {
+  my $subname = shift;
+
+  # warning potential error. It must be:
+  # 'SERVER()->{stored_procedures}{'.$subname.'}{sub}->(@_)', 
+  GRID::Machine::fork( "$subname".'(@_)', args => [ @_ ] );
+}
+
 sub waitpid #gm (filter => 'result')
 {
   my $process = shift;

@@ -61,6 +61,9 @@ examples/aliasremote.pl
 examples/anonymouscallback.pl
 examples/anonymouscallback2.pl
 examples/available.pl
+examples/async.pl
+examples/async1.pl
+examples/async2.pl
 examples/bind.pl
 examples/byreference.pl
 examples/callbackbyname.pl
