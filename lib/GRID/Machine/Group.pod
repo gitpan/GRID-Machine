@@ -629,7 +629,54 @@ The previous example is equivalent to this:
 
 =back
 
+=head2 About the C<pi> Example Used in this Manual
 
+In this manual we have used several times as an example the 
+computation of an approach to number Pi (3.14159...) using 
+numerical integration. To understand it,
+take into account that the area under the curve 1/(1+x**2) between 0 and 1
+is C<Pi/4 = (3.1415...)/4> as it shows the following debugger session: 
+
+
+  pp2@nereida:~/public_html/cgi-bin$ perl -wde 0
+  main::(-e:1):   0
+    DB<1>  use Math::Integral::Romberg 'integral'
+    DB<2> p integral(sub { my $x = shift; 4/(1+$x*$x) }, 0, 1);
+  3.14159265358972
+
+The module L<Math::Integral::Romberg> provides the function C<integral> 
+that allow us to compute the area of a given function in some 
+interval. In fact - if you remember your high
+school days - it is easy to see the reason: the integral of C<4/(1+$x*$x)> is
+C<4*arctg($x)> and so its area between 0 and 1 is given by:
+
+        4*(arctg(1) - arctg(0)) = 4 * arctg(1) = 4 * Pi / 4 = Pi
+
+
+This is not, in fact, a good way to compute Pi, but makes a good example
+of how to exploit several machines to fulfill a task. 
+
+To compute the area under C<4/(1+$x*$x)> we have divided up the interval C<[0,1]>
+into sub-intervals of size C<1/N> and add up the areas of the small
+rectangles with base C<1/N> and height the value of the curve C<4/(1+$x*$x)> in the middle of
+the interval. The following debugger session illustrates the idea:
+
+  pp2@nereida:~$ perl -wde 0
+  main::(-e:1):   0
+  DB<1> use List::Util qw(sum)
+  DB<2> $N = 6
+  DB<3> @divisions = map { $_/$N } 0..($N-1)
+  DB<4> sub f { my $x = shift; 4/(1+$x*$x) }
+  DB<5> @halves = map { $_+0.5/$N } @divisions
+  DB<6> $area = sum(map { f($_)/$N } @halves)
+  DB<7> p $area
+  3.14390742722244
+
+Since our goal is to optimize the execution time, we distribute
+the sum in line 6 C<$area = sum(map { f($_)/$N } @halves)> among
+the processors. The machines are numbered from 0 to C<np-1> 
+(being C<np> the number of machines) and each machine sums up
+the areas of roughly C<N/np> intervals. 
 
 
 =head1 AUTHOR
