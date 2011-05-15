@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               GRID-Machine
-version:            0.114
+version:            0.115
 abstract:           Remote Procedure Calls over a SSH link
 author:
     - Casiano Rodriguez-Leon <casiano@ull.es>

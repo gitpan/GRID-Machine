@@ -69,7 +69,8 @@ the local side.
 
 =item * The result of a remote call is a L<GRID::Machine::Result>
 object. Among the attributes of such object are the C<results> of the call, 
-the ouput produced in C<stdout> and C<stderr>, C<errmsg> etc. The remote function 
+are the outputs produced in C<stdout> and C<stderr>, C<errmsg> etc. 
+The remote function 
 can produce output without risk of misleading the protocol.
 
 =item * Services for the transference of files are provided
@@ -3369,7 +3370,7 @@ The syntax is:
 On success returns true, namely returns the address of the 
 subroutine on the remote side that works as I<proxy> of the 
 C<localsub> subroutine on the local side. 
-Exceptiomps will be thrown in case of failure.
+Exceptions will be thrown in case of failure.
 
 The following example shows a remote subroutine (lines 16-20)
 that calls a subroutine C<test_callback> 

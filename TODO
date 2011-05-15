@@ -1,6 +1,37 @@
+* errors in teh REMOTE code due to 'use' etc. errors appear as a premature closed filenadle 
+  fix this. Produce an accurate error message
+
+* sub method for GRID::Machine::Groups: launch the sub in all machines and then get the results
+  - around and filter and ... 
+  - "eval" and "call" are almost the same in Group objects. Factorize!!!
+    - Write "eval" method for GRID::Machine::Group objects
+  - timer in the select object of the parallel "call" to avoid hanging forever. 
+    The machine will be removed from the group. Exception if 
+    no machines are left in the group
+  - allow arguments in the call method to be an iterator. This way we can have "lazy arguments"
+    "sub sub" can have a "lazy" arg and save memory
+  - We need to kind of calls or subs: one that makes the  call on each machine, like
+              $c->chdir('tutu')
+
+    and the other a farm/master-worker sub
+
+  - divide and conquer and b&b: what to push? the result may imply new calls
+                push @result, ($t{0+$me}, $me->_get_result()); 
+
+                implement sort and other d&c examples
+  - allow Inline::C java, python and others making room for heterogenous programming
+  - fault tolerance: once there are no more  tasks to send, poll - from time to time -
+    the machines to see if the remote processes are alive. If not, resend the problem/job
+    to another alive machine
+  - From time to time, store the results in the result file, provide a recover parameter allowing
+    the recovery from a failure
+
+* take from GRID::Cluster the automatic authentication installator
+
 * I'm trying to see how IPC::PerlSSH behaves in case the underlying ssh connection gets disconnected.
   http://www.perlmonks.org/?node_id=792383
-* Add a parameter 'modputs' or s.t. like that to the constructor
+
+* Write an example of remotelibs in the constructor
 
 * Writing makemethod: make a proxy for an existing sub
    - factorize

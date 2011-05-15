@@ -1,7 +1,7 @@
 package GRID::Machine::Result;
 use List::Util qw(first);
 use overload q("") => 'str',
-             bool  => 'bool';
+             '0+'  => 'bool';
 
 my @legal = qw(type stdout stderr results errcode errmsg);
 my %legal = map { $_ => 1 } @legal;
@@ -42,7 +42,7 @@ sub noerr {
 sub bool {
   my $self = shift;
 
-  0+$self->Results > 1 ? 1 : $self->result;
+  0+$self->Results > 1 ? scalar($self->Results) : $self->result;
 }
 
 sub result {

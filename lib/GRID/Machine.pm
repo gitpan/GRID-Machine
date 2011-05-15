@@ -29,7 +29,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.114";
+our $VERSION = "0.115";
 
 my %_taken_id;
 {
@@ -112,6 +112,7 @@ sub find_host {
     prefix 
     pushinc unshiftinc
     readfunc 
+    readpipe
     remotelibs
     report
     scp 
@@ -120,10 +121,12 @@ sub find_host {
     sshpipe 
     sshoptions 
     startdir startenv 
+    survive
     tmpdir
     uses
     wait 
     writefunc 
+    writepipe
   );
   my %legal = map { $_ => 1 } @legal;
 
@@ -249,6 +252,8 @@ EOREMOTE
      my $user = '';
      my $options;
 
+
+    my ( $readpipe, $writepipe ); # pipes to communicate with the remote machine
      if( !defined $readfunc || !defined $writefunc ) {
         my @command;
         if( exists $opts{command} ) {
@@ -295,9 +300,17 @@ EOREMOTE
             {
                 # surround each options with quotes in case option contains a space
                 my @test_ssh_options = map { qq{'$_'} } @sshoptions;
-                  die "Can't execute perl in $host using ssh connection with automatic authentication\n"
-                unless is_operative("$ssh @test_ssh_options", $host, "perl -v", $wait);
-             }
+
+                my $errmessg = "Can't execute perl in machine '$host' via '$ssh' ".
+                (@test_ssh_options? "with options '@test_ssh_options' " : '').
+                "using automatic authentication in less than $wait seconds";
+
+                unless (is_operative("$ssh @test_ssh_options", $host, "perl -v", $wait)) {
+                  warn $errmessg;
+                  die unless $opts{survive};
+                  return;
+                }
+            }
 
            my %sshoptions = map { $sshoptions[$_] =~ /^-[pli]$/?  @sshoptions[$_, $_+1] : () } 0..$#sshoptions;
 
@@ -329,7 +342,7 @@ EOREMOTE
              print <<"HELPMSG";
 Debugging with '@command'
 Remember to run in a separate terminal
-     gmdb $host $portdebug
+     gmdb $host 
 or connect in another terminal via ssh to $host and run in $host netcat:
      netcat -v -l -p $portdebug
 or, better, if you have 'socat' installed in $host:
@@ -341,8 +354,6 @@ HELPMSG
              @command = ( $ssh, @sshoptions, $host, $opts{perl} || "perl", @perloptions );
            }
         }
-
-        my ( $readpipe, $writepipe );
 
           open my $saverr, ">& STDERR";
           open STDERR, "> /dev/null";
@@ -408,21 +419,23 @@ HELPMSG
 
 
      my $self = {
-        host       => $host,
-        port       => $port,
         debug      => $portdebug,
+        host       => $host,
         identity   => $identity,
-        readfunc   => $readfunc,
-        writefunc  => $writefunc,
         logic_id   => $logic_id,
         pid        => $pid,
+        port       => $port,
+        prefix     => $prefix,
+        PROCESSPIDS => [],
+        readfunc   => $readfunc,
+        readpipe   => $readpipe,
+        scp        => $scp,
         sendstdout => $sendstdout,
         ssh        => $ssh,
         sshpipe    => $sshpipe,
-        scp        => $scp,
         wait       => $wait,
-        prefix     => $prefix,
-        PROCESSPIDS => [],
+        writepipe  => $writepipe,
+        writefunc  => $writefunc,
      };
 
      my $machineclass = "$class"."::".(0+$self);
@@ -869,11 +882,11 @@ sub is_operative {
     my $operative;
 
     my $devnull = File::Spec->devnull();
+    my ( $savestdout, $savestdin, $savestderr);
     eval {
-        local $SIG{ALRM} = sub { die "Alarm exceeded $seconds seconds"; };
+        local $SIG{ALRM} = sub { die "Can't connect to $host via ssh in less than $seconds seconds $@$!"; };
         alarm($seconds);
 
-          my ( $savestdout, $savestdin, $savestderr);
           open($savestdout, ">& STDOUT"); # factorize!
           open($savestderr, ">& STDERR"); # factorize!
           open(STDOUT,">", $devnull);
@@ -892,6 +905,9 @@ sub is_operative {
     };
 
     if($@) {
+        open(STDOUT, ">&", $savestdout);
+        open(STDERR, ">&", $savestderr);
+        open(STDIN, "<&", $savestdin);
         return 0;
     }
     return $operative;

@@ -49,6 +49,8 @@ sub parseSSHConfig {
     $netcatcommand = $1 if !$netcatcommand and $hostdesc =~ /^#gm\s+netcat(?:command)?\s+'([^'\n]*)'/m;
 
     $netcatoptions = $1 if !$netcatoptions and $hostdesc =~ /^#gm\s+netcatopt(?:ions)?\s+'([^'\n]*)'/m;
+
+    $machine       = $1 if $hostdesc =~ /^\s*HostName\s+([\w.-]+)/m;
   }
 }
 

@@ -30,6 +30,8 @@ lib/GRID/Machine.pm
 lib/GRID/Machine.pod
 lib/GRID/Machine/Core.pm
 lib/GRID/Machine/Core.pod
+lib/GRID/Machine/Group.pm
+lib/GRID/Machine/Group.pod
 lib/GRID/Machine/IOHandle.pm
 lib/GRID/Machine/IOHandle.pod
 lib/GRID/Machine/MakeAccessors.pm
@@ -150,6 +152,17 @@ examples/package.pl
 examples/package2.pl
 examples/pdl.pl
 examples/pi.c
+examples/pi.pl
+examples/pi2.pl
+examples/pi3.pl
+examples/pi4.pl
+examples/pi5.pl
+examples/pi6.pl
+examples/pi7.pl
+examples/pi8.pl
+examples/pipes.pl
+examples/pipes1.pl
+examples/pipes2.pl
 examples/pipes.pl
 examples/pipes1.pl
 examples/pipes2.pl
@@ -169,6 +182,11 @@ examples/remotetest.pl
 examples/remotetest1.pl
 examples/remotetest2.pl
 examples/riofrommachine.pl
+examples/smallpar.pl
+examples/smallpar1.pl
+examples/smallpar2.pl
+examples/smallpar3.pl
+examples/smallpar4.pl
 examples/sharedclasses.pl
 examples/showloganderrfiles.pl
 examples/sshoptions.pl
@@ -216,5 +234,9 @@ examples/version.pl
 examples/wait1.pl
 examples/wait2.pl
 examples/waitpi.pl
+examples/watchgridmachines.pl
+examples/watchgridmachines2.pl
+examples/watchgridmachines3.pl
+examples/watchgridmachines4.pl
 examples/xclock.pl
 META.yml                                 Module meta-data (added by MakeMaker)
