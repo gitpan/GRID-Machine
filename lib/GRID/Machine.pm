@@ -29,7 +29,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.116";
+our $VERSION = "0.117";
 
 my %_taken_id;
 {

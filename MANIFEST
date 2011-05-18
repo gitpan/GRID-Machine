@@ -38,6 +38,7 @@ lib/GRID/Machine/MakeAccessors.pm
 lib/GRID/Machine/Message.pm
 lib/GRID/Machine/Message.pod
 lib/GRID/Machine/Process.pm
+lib/GRID/Machine/Process.pod
 lib/GRID/Machine/REMOTE.pm
 lib/GRID/Machine/REMOTE.pod
 lib/GRID/Machine/RIOHandle.pm

@@ -672,11 +672,15 @@ the interval. The following debugger session illustrates the idea:
   DB<7> p $area
   3.14390742722244
 
-Since our goal is to optimize the execution time, we distribute
+To optimize the execution time
+we distribute
 the sum in line 6 C<$area = sum(map { f($_)/$N } @halves)> among
-the processors. The machines are numbered from 0 to C<np-1> 
-(being C<np> the number of machines) and each machine sums up
-the areas of roughly C<N/np> intervals. 
+several processes. The processes are numbered from 0 to C<np-1>.
+Each process sums up the areas of roughly C<N/np> intervals. 
+We can spedup the computation if 
+each process is allocated to a different processor (or core).
+
+
 
 
 =head1 AUTHOR

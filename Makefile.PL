@@ -50,6 +50,7 @@ doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
 	cd tt2; tpage  IOHandle.tt2 > ../lib/GRID/Machine/IOHandle.pod
 	cd tt2; tpage  perlparintro.tt2 > ../lib/GRID/Machine/perlparintro.pod
 	cd tt2; tpage  remotedebugtut.tt2 > ../lib/GRID/Machine/remotedebugtut.pod
+	cd tt2; tpage  Process.tt2 > ../lib/GRID/Machine/Process.pod
 	cd tt2; tpage  Group.tt2 > ../lib/GRID/Machine/Group.pod
 
 publicdist: rmdist dist
@@ -80,6 +81,10 @@ xdvi: doc
 	latex remotedebugtut
 	latex remotedebugtut
 	makeindex remotedebugtut; latex remotedebugtut.tex 
+	pod2latex -full -prefile preamble.tex lib/GRID/Machine/Process.pod
+	latex Process
+	latex Process
+	makeindex Process; latex Process.tex 
 	pod2latex -full -prefile preamble.tex lib/GRID/Machine/Group.pod
 	latex Group
 	latex Group
@@ -92,6 +97,7 @@ html: doc
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/IOHandle.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/perlparintro.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/remotedebugtut.pod
+	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/Process.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc lib/GRID/Machine/Group.pod
 	mpod2html -nowarnings -noverbose -nonavigation -nobanner -noidx -notoc scripts/remotetest.pl
 

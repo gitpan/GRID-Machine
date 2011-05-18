@@ -207,8 +207,10 @@ be executed in that machine using this one-liner:
 
 =head1 A PARALLEL ALGORITHM 
 
-We are going to compute an approach to the number Pi (3.14159...) using 
-numerical integration. Namely the area under the curve 1/(1+x**2) between 0 and 1
+In this manual we have used several times as an example the 
+computation of an approach to number Pi (3.14159...) using 
+numerical integration. To understand it,
+take into account that the area under the curve 1/(1+x**2) between 0 and 1
 is C<Pi/4 = (3.1415...)/4> as it shows the following debugger session: 
 
 
@@ -230,7 +232,7 @@ C<4*arctg($x)> and so its area between 0 and 1 is given by:
 This is not, in fact, a good way to compute Pi, but makes a good example
 of how to exploit several machines to fulfill a task. 
 
-To compute the area under C<4/(1+$x*$x)> we can divide up the interval C<[0,1]>
+To compute the area under C<4/(1+$x*$x)> we have divided up the interval C<[0,1]>
 into sub-intervals of size C<1/N> and add up the areas of the small
 rectangles with base C<1/N> and height the value of the curve C<4/(1+$x*$x)> in the middle of
 the interval. The following debugger session illustrates the idea:
@@ -246,11 +248,18 @@ the interval. The following debugger session illustrates the idea:
   DB<7> p $area
   3.14390742722244
 
-Since our goal is to optimize the execution time, we will distribute
+To optimize the execution time
+we distribute
 the sum in line 6 C<$area = sum(map { f($_)/$N } @halves)> among
-the processors. The machines will be numbered from 0 to C<np-1> 
-(being C<np> the number of machines) and each machine will sum up
-the areas of roughly C<N/np> intervals. To achieve  a higher performance
+several processes. The processes are numbered from 0 to C<np-1>.
+Each process sums up the areas of roughly C<N/np> intervals. 
+We can spedup the computation if 
+each process is allocated to a different processor (or core).
+
+
+
+
+To achieve  a higher performance
 the code to execute on each machine is written in C:
 
   ~/src/perl/grid-machine/examples$ cat -n pi.c
@@ -296,7 +305,75 @@ To get the executable we have a simple C<Makefile>:
      1  pi:
      2          cc pi.c -o pi
 
-=head1 COORDINATING A CLUSTER 
+=head1 PARALLEL COMPUTING MADE EASY: USING L<GRID::Machine::Group>
+
+The L<GRID::Machine::Group> module provides Parallel Remote Procedure Calls
+(RPC) to a cluster of machines via a SSH connection. 
+The result of a remote call is a L<GRID::Machine::Group::Result>
+object. 
+
+The call at line 31 returns a new instance of a L<GRID::Machine::Group>
+object. 
+The object is blessed in a unique class that inherits from 
+C<GRID::Machine::Group>. That is, the new object is a I<singleton>.
+When later the cluster object C<GRID::Machine::Group> 
+is provided with new methods,
+those are installed in the I<singleton> class.
+
+
+
+  $ cat -n pi7.pl
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  use GRID::Machine::Group;
+     5  use List::Util qw(sum);
+     6  
+     7  my @MACHINE_NAMES = split /\s+/, $ENV{MACHINES};
+     8  my $code = << 'EOFUNCTION';
+     9     double sigma(int id, int N, int np) {
+    10       double sum = 0;
+    11       int i;
+    12       for(i = id; i < N; i += np) {
+    13           double x = (i + 0.5) / N;
+    14           sum += 4 / (1 + x * x);
+    15       }
+    16       sum /= N; 
+    17       return sum;
+    18     }
+    19  EOFUNCTION
+    20  ;
+    21  
+    22  my @m = map { 
+    23                GRID::Machine->new(
+    24                   host => $_, 
+    25                   wait => 5, 
+    26                   uses => [ qq{Inline  'C' => q{$code}} ],
+    27                   survive => 1,
+    28                ) 
+    29              } @MACHINE_NAMES;
+    30  
+    31  my $c = GRID::Machine::Group->new(cluster => [ @m ]);
+    32  
+    33  my ($N, $np, $pi)  = (1000, 4, 0);
+    34  
+    35  my @args = map {  [$_, $N, $np] } 0..$np-1;
+    36  
+    37  my @r = $c->eval(q{ sigma(@_) }, args => \@args)->Results;
+    38  
+    39  print sum(@r)."\n";
+
+
+The C<eval> method of L<GRID::Machine::Group> 
+(see line 37 in the example below)
+computes some code on each of the machines belonging to the
+cluster object. 
+
+In this example,  L<Inline::C>  is used 
+in the remote machines to make the computation more efficient.
+We assume that L<Inline::C> is already installed in the remote machines.
+
+=head1 WORKING HARDER: COORDINATING A CLUSTER 
 
 The program C<gridpipes.pl> following in the lines
 below runs C<$np> copies of
