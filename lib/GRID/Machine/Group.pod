@@ -214,8 +214,7 @@ The C<sub> method installs the specified method on each of the machines in the c
 Once the method is installed via C<sub> it can be called as a a method of
 the L<GRID::Machine::Group> object:
 
-
-  ~/grid-machine/examples$ cat -n smallpar4.ppl 
+  $ cat -n smallpar5.pl 
      1  #!/usr/bin/perl -w
      2  use strict;
      3  use Data::Dumper;
@@ -233,37 +232,88 @@ the L<GRID::Machine::Group> object:
     15    return { sq => $a*$a }
     16  });
     17  
-    18  my $r = $group->do_something( replicate => sub { 1+$_->logic_id } );
-    19  
-    20  print Dumper($r);
+    18  print "Parallel:\n";
+    19  my $r = $group->do_something( replicate => sub { 1+$_->logic_id } );
+    20  
+    21  print Dumper($r);
+    22  
+    23  print "Sequentially:\n";
+    24  for (@m) {
+    25    my $r = $_->do_something(  1+$_->logic_id );
+    26    print Dumper($r);
+    27  }
 
-The former example, when executed, produces an output like this:
+The C<replicate> key used in the call at line 19
+calls to the C<sub { 1+$_-E<gt>logic_id }>
+as many times as machines
+has the L<GRID::Machine::Group> object.
+The former example, when executed in a two machines 
+L<GRID::Machine::Group> object, produces an output like this:
 
-  ~/grid-machine/examples$ perl smallpar4.ppl 
+  MacBookdeCasiano:examples casiano$ perl smallpar5.pl 
+  Parallel:
   $VAR1 = bless( [
-                 bless( {
-                          'stderr' => '',
-                          'errmsg' => '',
-                          'type' => 'RETURNED',
-                          'stdout' => '',
-                          'errcode' => 0,
-                          'results' => [ { 'sq' => 1 } ]
-                        }, 'GRID::Machine::Result' ),
-                 bless( {
-                          'stderr' => '',
-                          'errmsg' => '',
-                          'type' => 'RETURNED',
-                          'stdout' => '',
-                          'errcode' => 0,
-                          'results' => [ { 'sq' => 4 } ]
-                        }, 'GRID::Machine::Result' )
-               ], 'GRID::Machine::Group::Result' );
+                   bless( {
+                            'stderr' => '',
+                            'errmsg' => '',
+                            'type' => 'RETURNED',
+                            'stdout' => '',
+                            'errcode' => 0,
+                            'results' => [
+                                           {
+                                             'sq' => 1
+                                           }
+                                         ]
+                          }, 'GRID::Machine::Result' ),
+                   bless( {
+                            'stderr' => '',
+                            'errmsg' => '',
+                            'type' => 'RETURNED',
+                            'stdout' => '',
+                            'errcode' => 0,
+                            'results' => [
+                                           {
+                                             'sq' => 4
+                                           }
+                                         ]
+                          }, 'GRID::Machine::Result' )
+                 ], 'GRID::Machine::Group::Result' );
+  Sequentially:
+  $VAR1 = bless( {
+                   'stderr' => '',
+                   'errmsg' => '',
+                   'type' => 'RETURNED',
+                   'stdout' => '',
+                   'errcode' => 0,
+                   'results' => [
+                                  {
+                                    'sq' => 1
+                                  }
+                                ]
+                 }, 'GRID::Machine::Result' );
+  $VAR1 = bless( {
+                   'stderr' => '',
+                   'errmsg' => '',
+                   'type' => 'RETURNED',
+                   'stdout' => '',
+                   'errcode' => 0,
+                   'results' => [
+                                  {
+                                    'sq' => 4
+                                  }
+                                ]
+                 }, 'GRID::Machine::Result' );
+
 
 
 =head2 The C<makemethod> method
 
 The C<makemethod> method installs an already existing remote subroutine
-as a method of the L<GRID::Machine::Group> object. See line 33 below:
+as a method of the L<GRID::Machine::Group> object. 
+In the following example, a C function named C<sigma> (lines 10-18) is installed
+in the remote machines via L<Inline::C> (line 26).
+Proxy methods on the local side are installed both for the individual machines and the cluster
+in line 33: 
 
   $ cat -n pi6.pl
      1  #!/usr/bin/perl -w
@@ -458,6 +508,17 @@ giving an iterator. See the call to C<suma_areas> in line 30::
     30  print sum($c->suma_areas( args => { next => \&next, thereareargs => \&thereare, reset => \&reset } )->Results)."\n";
 
 An iterator is specified passing a hashref with keys C<next>, C<thereareargs> and C<reset>.
+
+=over 2
+
+=item * C<next> returns the next item 
+
+=item * C<thereareargs> returns C<true> if the iterator has not finished
+
+=item * C<reset> initializes the iterator
+
+=back
+
 When executed, the previous program produces an output like this:
 
   ~/grid-machine/examples$ perl pi3.pl
@@ -470,8 +531,10 @@ When executed, the previous program produces an output like this:
 
 =item * 
 We can use the key C<replicate> instead of C<args>
-to specify the arguments. The value is an C<ARRAY> ref.
-In such case the argument gets replicated, one per machine:
+to specify the arguments. 
+The only argument is replicated as many times as machines
+has the L<GRID::Machine::Group> object.
+The value can be an C<ARRAY> ref or a C<CODE> ref:
 
   $ cat -n smallpar2.pl 
      1  #!/usr/bin/perl -w
@@ -495,7 +558,8 @@ In such case the argument gets replicated, one per machine:
     19  
     20  print Dumper($r);
 
-When executed, the former program produces:
+When executed in a Group of two machines, two calls to C<do_something>  with argument C<4> are performed
+in parallel, one per machine. The former program produces:
 
   ~/grid-machine/examples$ perl smallpar2.pl 
   $VAR1 = bless( [
@@ -605,7 +669,9 @@ with argument C<replicate =E<gt> []>:
     16  
     17  print Dumper($r);
 
-The convenience function C<void> returns the string C<replicate =E<gt> []>.
+=item * 
+The convenience function C<void> exported by L<GRID::Machine::Group> 
+returns the string C<'replicate =E<gt> []'>.
 The previous example is equivalent to this:
 
   ~/grid-machine/examples$ cat -n smallpar.pl 
@@ -679,6 +745,63 @@ several processes. The processes are numbered from 0 to C<np-1>.
 Each process sums up the areas of roughly C<N/np> intervals. 
 We can spedup the computation if 
 each process is allocated to a different processor (or core).
+
+
+
+=head2 Performance
+
+The following code is a modification of the canonical example computing C<pi>.
+Timers have been included (lines 28 and 31) to see the influence of the number of 
+processors:
+
+  $ cat -n examples/pi.pl
+     1  #!/usr/bin/perl -w
+     2  use strict;
+     3  use GRID::Machine;
+     4  use GRID::Machine::Group;
+     5  use List::Util qw(sum);
+     6  use Time::HiRes qw(time gettimeofday tv_interval);
+     7  
+     8  my @MACHINE_NAMES = split /\s+/, $ENV{MACHINES};
+     9  my @m = map { GRID::Machine->new(host => $_, wait => 5, survive => 1) } @MACHINE_NAMES;
+    10  
+    11  my $c = GRID::Machine::Group->new(cluster => [ @m ]);
+    12  
+    13  $c->sub(suma_areas => q{
+    14     my ($id, $N, $np) = @_;
+    15       
+    16     my $sum = 0;
+    17     for (my $i = $id; $i < $N; $i += $np) {
+    18         my $x = ($i + 0.5) / $N;
+    19         $sum += 4 / (1 + $x * $x);
+    20     }
+    21     $sum /= $N; 
+    22  });
+    23  
+    24  my ($N, $np, $pi)  = (1e7, 4, 0);
+    25  
+    26  my @args = map {  [$_, $N, $np] } 0..$np-1;
+    27  
+    28  my $t0 = [gettimeofday];
+    29  $pi = sum($c->suma_areas(args => \@args)->Results);
+    30  my $elapsed = tv_interval ($t0);
+    31  print "Pi = $pi. N = $N Time = $elapsed\n";
+
+
+When executed in one machine, it takes 5.387676 seconds:
+
+  ~/grid-machine$ export MACHINES=local
+  ~/grid-machine$ perl examples/pi.pl
+  Pi = 3.14159265358969. N = 10000000 Time = 5.387676
+
+When executed in a cluster with two nodes we get a speedup of 1.81 = 5.387676/2.977237:
+
+  ~/grid-machine$ echo $MACHINES
+  local imac
+  ~/grid-machine$ perl examples/pi.pl
+  Pi = 3.14159265358969. N = 10000000 Time = 2.977237
+
+
 
 
 

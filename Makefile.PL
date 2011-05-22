@@ -41,7 +41,7 @@ sub targets {
 
   local $_ = <<'EOT';
 
-doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2
+doc:tt2/Machine.tt2 tt2/Message.tt2 tt2/REMOTE.tt2 tt2/Result.tt2 tt2/Process.tt2 tt2/Group.tt2
 	cd tt2; tpage  Machine.tt2 > ../lib/GRID/Machine.pod
 	cd tt2; tpage  Message.tt2 > ../lib/GRID/Machine/Message.pod
 	cd tt2; tpage  REMOTE.tt2 > ../lib/GRID/Machine/REMOTE.pod
