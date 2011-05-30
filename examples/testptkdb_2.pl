@@ -4,15 +4,14 @@
 use strict;
 use GRID::Machine;
 
-my $host = 'casiano@beowulf.pcg.ull.es';
+my $host = $ENV{GRID_REMOTE_MACHINE};
 
 my $machine = GRID::Machine->new(
    command => "ssh -X $host perl", 
 );
 
 print $machine->eval(q{ 
-  print "$ENV{DISPLAY}\n";
-  system('xclock &');
+  print "$ENV{DISPLAY}\n" if $ENV{DISPLAY};
+  CORE::system('xclock') and  warn "Mmmm.. something went wrong!\n";
   print "Hello world!\n";
 });
-

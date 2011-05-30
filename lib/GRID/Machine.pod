@@ -727,27 +727,66 @@ when executed, the program produces the following output:
 This argument is an alternative to the C<host> argument. Use one or the other. It allows 
 a more specific control of the command executed.
 
-It can be a reference to a list or a string. It fully specifies the C<command> to execute. 
-The following example initiates a SSH connection with the remote machine
-with X11 forwarding
+It can be a I<reference to a list> or a I<string>. It fully specifies the C<command> to execute. 
 
- $ cat -n pp2_testptkdb.pl
-   1  #!/usr/local/bin/perl -w
-   2  # Execute this program being the user
-   3  # that initiated the X11 session
-   4  use strict;
-   5  use GRID::Machine;
-   6
-   7  my $host = 'casiano@beowulf.pcg.ull.es';
-   8
-   9  my $machine = GRID::Machine->new(
-  10     command => ['ssh', '-X', $host, 'perl'],
-  11  );
-  12
-  13  print $machine->eval(q{
-  14    print "$ENV{DISPLAY}\n";
-  15    system('xclock ');
-  16  });
+=over 2 
+
+=item Example 1
+
+The following example uses L<Net::OpenSSH> to open a SSH connection
+using I<password authentication> instead of asymmetric cryptography:
+
+  $ cat -n openSSH.pl 
+     1  use strict;
+     2  use warnings;
+     3  use Net::OpenSSH;
+     4  use GRID::Machine;
+     5  
+     6  my $host = (shift() or $ENV{GRID_REMOTE_MACHINE});
+     7  my @ARGS;
+     8  push @ARGS, (user      => $ENV{USR})   if $ENV{USR};
+     9  push @ARGS, ( password => $ENV{PASS}) if $ENV{PASS};
+    10  
+    11  my $ssh = Net::OpenSSH->new($host, @ARGS); 
+    12  $ssh->error and die "Couldn't establish SSH connection: ". $ssh->error;
+    13  
+    14  my @cmd = $ssh->make_remote_command('perl');
+    15  { local $" = ','; print "@cmd\n"; }
+    16  my $grid = GRID::Machine->new(command => \@cmd);
+    17  my $r = $grid->eval('print "hello world!\n"');
+    18  print "$r\n";
+
+when executed produces an output like this:
+
+  $ perl openSSH.pl 
+  ssh,-S,/Users/localuser/.libnet-openssh-perl/user-machine-2413-275647,-o,User=user,--,machine,perl
+  hello world!
+
+
+=item Example 2
+
+The argument associated with C<command> can be a string. 
+The following example initiates a SSH connection with the remote machine
+with X11 forwarding:
+
+  $ cat -n testptkdb_2.pl 
+     1  #!/usr/local/bin/perl -w
+     2  # Execute this program being the user
+     3  # that initiated the X11 session
+     4  use strict;
+     5  use GRID::Machine;
+     6  
+     7  my $host = $ENV{GRID_REMOTE_MACHINE};
+     8  
+     9  my $machine = GRID::Machine->new(
+    10     command => "ssh -X $host perl", 
+    11  );
+    12  
+    13  print $machine->eval(q{ 
+    14    print "$ENV{DISPLAY}\n" if $ENV{DISPLAY};
+    15    CORE::system('xclock') and  warn "Mmmm.. something went wrong!\n";
+    16    print "Hello world!\n";
+    17  });
 
 It will produce an output like:
 
@@ -756,27 +795,8 @@ It will produce an output like:
 
 and I<a graphics clock will pop-up on your window>.
 
-The argument associated with C<command> can be a string. The previous example
-can be rewritten as:
 
-
-  pp2@nereida:~/LGRID_Machine/examples$ cat -n testptkdb_2.pl
-     1  #!/usr/local/bin/perl -w
-     2  # Execute this program being the user
-     3  # that initiated the X11 session
-     4  use strict;
-     5  use GRID::Machine;
-     6
-     7  my $host = 'casiano@beowulf.pcg.ull.es';
-     8
-     9  my $machine = GRID::Machine->new(
-    10     command => "ssh -X $host perl",
-    11  );
-    12
-    13  print $machine->eval(q{
-    14    print "$ENV{DISPLAY}\n";
-    15    system('xclock ');
-    16  });
+=item Example 3
 
 Another example of use of the C<command> option is to put the remote
 side on I<debugging> mode:
@@ -809,6 +829,9 @@ and now run the program:
 
 The prompt of the debugger will appear in the netcat terminal
 
+=back 
+
+
 =item * debug
 
 The value must be a port number higher than 1024. Used to run the remote
@@ -819,6 +842,39 @@ side under the control of the debugger. See the section L<REMOTE DEBUGGING>
         debug => $port,
         includes => [ qw{SomeFunc} ],
      );
+
+=item * survive
+
+No exception will be produced if the connection fails.
+Instead C<undef> is returned. Often used when building several L<GRID::Machines>
+and you don't care (too much) if one of them fails::
+
+  $ cat pi8.pl 
+  #!/usr/bin/perl -w
+  use strict;
+  use GRID::Machine;
+  use GRID::Machine::Group;
+  use Data::Dumper;
+
+  my @MACHINE_NAMES = split /\s+/, $ENV{MACHINES};
+  my @m = map { GRID::Machine->new(host => $_, wait => 5, survive => 1) } @MACHINE_NAMES;
+
+  my $c = GRID::Machine::Group->new(cluster => [ @m ]);
+
+  $c->sub(suma_areas => q{
+     my ($id, $N, $np) = @_;
+       
+     my $sum = 0;
+     for (my $i = $id; $i < $N; $i += $np) {
+         my $x = ($i + 0.5) / $N;
+         $sum += 4 / (1 + $x * $x);
+     }
+     $sum /= $N; 
+  });
+
+  my ($N, $np, $pi)  = (1000, 4, 0);
+
+  print Dumper($c->suma_areas(args => [ map {  [$_, $N, $np] } 0..$np-1 ]));
 
 =back
 

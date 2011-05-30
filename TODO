@@ -1,5 +1,14 @@
-* errors in teh REMOTE code due to 'use' etc. errors appear as a premature closed filenadle 
+* GRID::Machine machines with names $_... will be the local machine. 
+       no SSH connection, simply open2
+* number of cores in a machine.
+  modify "call" accordingly
+  copy from GRID::cluster
+* use Net::OpenSSH
+
+* errors in the REMOTE code due to 'use' etc. errors appear as a premature closed filenadle 
   fix this. Produce an accurate error message
+
+* Inline::C cache the program at the start in the remote machine
 
 * sub method for GRID::Machine::Groups: launch the sub in all machines and then get the results
   - around and filter and ... 
@@ -20,6 +29,7 @@
 
                 implement sort and other d&c examples
   - allow Inline::C java, python and others making room for heterogenous programming
+
   - fault tolerance: once there are no more  tasks to send, poll - from time to time -
     the machines to see if the remote processes are alive. If not, resend the problem/job
     to another alive machine

@@ -1,9 +1,9 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 use strict;
 use GRID::Machine qw(is_operative);
 use Data::Dumper;
 
-my $host = 'casiano@beowulf.pcg.ull.es';
+my $host = $ENV{GRID_REMOTE_MACHINE};
 
 my $machine = GRID::Machine->new(
    host => $host, 
@@ -12,7 +12,7 @@ my $machine = GRID::Machine->new(
 
 system('xhost +');
 print $machine->eval(q{ 
-  print "$ENV{DISPLAY}\n";
-  system('xclock ');
+  print "$ENV{DISPLAY}\n" if $ENV{DISPLAY};
+  CORE::system('xclock') and  warn "Mmmm.. something went wrong!";
 });
 
