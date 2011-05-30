@@ -29,7 +29,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = "0.119";
+our $VERSION = '0.120';
 
 my %_taken_id;
 {
@@ -85,7 +85,12 @@ sub find_host {
   my %option;
 
   die "Error in GRID::Machine findhost. No command provided\n" unless $command;
-  $command =~ s{^\s*(\S+)\s*}{};
+  $command =~ s{^\s*
+                   (\S+                                      # ssh
+                       (?:\s+-[1246AaCfgKkMNnqsTtVvXxYy])*   # -6 -A -f ... options without arg
+                   )
+                 \s*
+               }{}x;
   $option{ssh} = $1;
   while ($command =~ s{^\s*(-\w)\s+(\S*)}{}g) {
     $option{$1} = $2;

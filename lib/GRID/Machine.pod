@@ -83,164 +83,6 @@ between machines
 
 =back
 
-=head1 INSTALLATION
-
-To install L<GRID::Machine>, follow these steps:
-
-=over 2
-
-=item  * Set automatic ssh-authentication with a machine where you have an account.
-
-SSH includes the ability to authenticate users using public keys. Instead of 
-authenticating the user with a password, the SSH server on the remote machine will
-verify a challenge signed by the user's I<private key> against its copy
-of the user's I<public key>. To achieve this automatic ssh-authentication
-you have to:
-
-=over 2
-
-=item * Generate a public key use the C<ssh-keygen> utility. For example:
-
-  local.machine$ ssh-keygen -t rsa -N ''
-
-The option C<-t> selects the type of key you want to generate.
-There are three types of keys: I<rsa1>, I<rsa> and I<dsa>.
-The C<-N> option is followed by the I<passphrase>. The C<-N ''> setting
-indicates that no pasphrase will be used. This is useful when used 
-with key restrictions or when dealing with cron jobs, batch 
-commands and automatic processing which is the context in which this 
-module was designed.
-If still you don't like to have a private key without passphrase, 
-provide a passphrase and use C<ssh-agent> 
-to avoid the inconvenience of typing the passphrase each time. 
-C<ssh-agent> is a program you run once per login sesion and load your keys into.
-From that moment on, any C<ssh> client will contact C<ssh-agent>
-and no more passphrase typing will be needed.
-
-By default, your identification will be saved in a file C</home/user/.ssh/id_rsa>.
-Your public key will be saved in C</home/user/.ssh/id_rsa.pub>.
-
-=item * Once you have generated a key pair, you must install the public key on the 
-remote machine. To do it, append the public component of the key in
-
-           /home/user/.ssh/id_rsa.pub
-
-to file 
-
-           /home/user/.ssh/authorized_keys
-           
-on the remote machine.
-If the C<ssh-copy-id> script is available, you can do it using:
-
-  local.machine$ ssh-copy-id -i ~/.ssh/id_rsa.pub user@remote.machine
-
-Alternatively you can write the following command:
-
-  $ ssh remote.machine "umask 077; cat >> .ssh/authorized_keys" < /home/user/.ssh/id_rsa.pub
-
-The C<umask> command is needed since the SSH server will refuse to 
-read a C</home/user/.ssh/authorized_keys> files which have loose permissions.
-
-=item * Edit your local configuration file C</home/user/.ssh/config> (see C<man ssh_config> 
-in UNIX) and create a new section for C<GRID::Machine> connections to that host.
-Here follows an example:
-
-
- ...
-
- # A new section inside the config file: 
- # it will be used when writing a command like: 
- #                     $ ssh gridyum 
-
- Host gridyum
-
- # My username in the remote machine
- user my_login_in_the_remote_machine
-
- # The actual name of the machine: by default the one provided in the
- # command line
- Hostname real.machine.name
-
- # The port to use: by default 22
- Port 2048
-
- # The identitiy pair to use. By default ~/.ssh/id_rsa and ~/.ssh/id_dsa
- IdentityFile /home/user/.ssh/yumid
-
- # Useful to detect a broken network
- BatchMode yes
-
- # Useful when the home directory is shared across machines,
- # to avoid warnings about changed host keys when connecting
- # to local host
- NoHostAuthenticationForLocalhost yes
-
-
- # Another section ...
- Host another.remote.machine an.alias.for.this.machine
- user mylogin_there
-
- ...
-
-This way you don't have to specify your I<login> name on the remote machine even if it
-differs from your  I<login> name in the local machine, you don't have to specify the 
-I<port> if it isn't 22, etc. This is the I<recommended> way to work with C<GRID::Machine>.
-Avoid cluttering the constructor C<new>.
-
-=item * Once the public key is installed on the server you should be able to
-authenticate using your private key
-
-  $ ssh remote.machine
-  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686
-  Last login: Sat Jul  7 13:34:00 2007 from local.machine
-  user@remote.machine:~$                                 
-
-You can also automatically execute commands in the remote server:
-
-  local.machine$ ssh remote.machine uname -a
-  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686 GNU/Linux
-
-=item * Once you have installed L<GRID::Machine> you can check that C<perl> can
-be executed in that machine using this one-liner:
-
-  $ perl -e 'use GRID::Machine qw(is_operative); print is_operative("ssh", "beowulf")."\n"'
-  1
-
-=back
-
-
-
-
-=item  * Before running the tests. Set on the local machine the environment variable 
-C<GRID_REMOTE_MACHINE> to point to a machine that is available using automatic authenticatication. 
-For example, on a C<bash>:
-
-        export GRID_REMOTE_MACHINE=user@machine.domain
-
-Otherwise most connectivity tests will be skipped. This and the previous steps are optional.
-
-=item * Follow the traditional steps:
-
-   perl Makefile.PL
-   make
-   make test
-   make install
-
-=back
-
-
-
-
-=head1 DEPENDENCIES
-
-This module requires these other modules and libraries:
-
-=over 2
-
-=item *  Module::Which version '0.0205'
-
-=back 
-
 =head1 METHODS ON THE LOCAL SIDE
 
 =head2 The Constructor C<new>
@@ -337,9 +179,7 @@ See the result of an attempt to connect to a machine when there is no automatic 
 
 The following arguments are legal:
 
-=over 2
-
-=item * host
+=head4 host
 
 The host to connect. The user can be specified here.
 Also the port. I.e. it can be something like:
@@ -380,7 +220,7 @@ file:
  # to local host
  NoHostAuthenticationForLocalhost yes
 
-=item * logic_id
+=head4 logic_id
 
 An integer. Contains the logical identifier associated with the L<GRID::Machine>.
 By default, 0 if it was the first L<GRID::Machine> created, 1 if it was the second, etc.
@@ -406,7 +246,7 @@ the execution produces the following output:
   1
   2
 
-=item * log
+=head4 log
 
 Relative path of the file where remote C<STDOUT> will be redirected.
 Each time a RPC occurs STDOUT is redirected to a file. 
@@ -416,7 +256,7 @@ as returned by C<File::Spec->tmpdir()>, C<$LOCALPID> is the PID of the process r
 and C<$REMOTEPID> is the PID of the process running
 in the remote machine.
 
-=item * err
+=head4 err
 
 Relative path of the file where remote C<STDERR> will be redirected.
 Each time a RPC occurs STDERR is redirected to a file. 
@@ -426,7 +266,7 @@ as returned by C<File::Spec->tmpdir()>, C<$LOCALPID> is the PID of the process r
 and C<$REMOTEPID> is the PID of the process running
 in the remote machine.
 
-=item * report
+=head4 report
 
 Relative path of the report file where the (remote) method
 C<remotelog> writes.
@@ -467,7 +307,7 @@ The C<report> file contains:
   $ ssh $GRID_REMOTE_MACHINE cat /tmp/rperl/1309_4318.report
   4318:Sat Apr 16 20:28:22 2011  => This message will be saved in the report file
 
-=item * wait
+=head4 wait
 
 Maximum number of seconds to wait for the setting of the connection.
 If an automatic connection can't be established in such time.
@@ -475,12 +315,12 @@ The constructor calls the C<is_operative function>
 (see section L<The Function is_operative>) to check this.
 The default value is 15 seconds.
 
-=item * ssh
+=head4 ssh
 
 A string.  Specifies the C<ssh> command to be used. Take advantage of this if
 you want to specify some special parameters. Defaults to C<ssh>. 
 
-=item * sshoptions
+=head4 sshoptions
 
 An C<ARRAY> ref or a string. Specifies options for the C<ssh> command.
 See an example in which is a string:
@@ -502,28 +342,28 @@ an another in which is an array ref:
 
 
 
-=item * scp
+=head4 scp
 
 A string defining the program to use to transfer files between the local and remote
 machines. Defaults to C<scp -q -p>.
 
-=item * readfunc
+=head4 readfunc
 
 Reference to the function used to read from the other side of the pipe. Returns the length
 of the message. Receives the buffer where the message will be stored. The second optional argument
 is the number of characters to read.
 
-=item * writefunc
+=head4 writefunc
 
 Reference to the function used to write to the other side of the pipe. Receives
 the message to write. By default is:
 
-=item * cleanup
+=head4 cleanup
 
 Boolean. If true the remote log files for STDOUT and STDERR will be erased
 when the connection ends. True by default.
 
-=item * sendstdout
+=head4 sendstdout
 
 Boolean. If true the contents of STDOUT and STDERR after each RPC are sent 
 to the client. By default is true. The following example illustrates its use:
@@ -555,7 +395,7 @@ result is still available:
                     GRID::Machine
 
 
-=item * perl
+=head4 perl
 
 A string. The perl interpreter to use in the remote machine.
 See an example:
@@ -585,7 +425,7 @@ when executed the program produces an output similar to this:
     /usr/local/lib/perl/5.8.4
     etc. etc.
 
-=item * perloptions
+=head4 perloptions
 
 A string or an array ref. Contains the options to be passed to the Perl interpreter.
 See an example:
@@ -611,7 +451,7 @@ inside a remote C<sub> must be done as in this example:
 
 
 
-=item * remotelibs
+=head4 remotelibs
 
 An C<ARRAY> reference. The referenced array contain the list of modules
 that will be loaded when bootstrapping
@@ -625,7 +465,7 @@ By default the following modules are loaded:
 
 See the section L<EXTENDING THE PROTOCOL> for a full example.
 
-=item * startdir
+=head4 startdir
 
 The string specifying the directory where the remote execution starts.
 By default the home directory. For example:
@@ -634,17 +474,17 @@ By default the home directory. For example:
 
 If it does not exist is created.
 
-=item * startenv
+=head4 startenv
 
 A reference to a hash. It will be used to modify the remote
 C<%ENV>.
 
-=item * pushinc
+=head4 pushinc
 
 Reference to a list of directories. All this directories will be C<push>ed in the C<@INC>
 list of the remote machine
 
-=item * unshiftinc
+=head4 unshiftinc
 
 Reference to a list of directories. All this directories will be C<unshift>ed in the C<@INC>
 list of the remote machine. See an example:
@@ -659,13 +499,13 @@ list of the remote machine. See an example:
     print $m->eval(q{ local $" = "\n"; print  "@INC"; });
 
 
-=item * prefix
+=head4 prefix
 
 Libraries can be transferred from the local to the remote server.
 The prefix option is a string containing the directory where 
 the libraries will be stored. By default is C<$ENV{HOME}/perl5lib>.
 
-=item * uses
+=head4 uses
 
 A reference to an ARRAY of strings. Determines the modules that will be 
 loaded when the remote Perl interpreter is started. The enumerated modules must be 
@@ -676,7 +516,7 @@ available on the remote side. For instance:
 See the section 
 L<Opaque Structures> for a full example
 
-=item * includes
+=head4 includes
 
 A reference to an ARRAY of strings. Determines the "remote modules"
 that will be included when the remote Perl interpreter is started.
@@ -722,7 +562,7 @@ when executed, the program produces the following output:
   machine: beowulf: Inside sub two(7 9 2 8)
   Max of (7, 9, 2, 8) is: 9
 
-=item * command
+=head4 command
 
 This argument is an alternative to the C<host> argument. Use one or the other. It allows 
 a more specific control of the command executed.
@@ -731,7 +571,8 @@ It can be a I<reference to a list> or a I<string>. It fully specifies the C<comm
 
 =over 2 
 
-=item Example 1
+=item Example 1: Using I<password authentication> 
+
 
 The following example uses L<Net::OpenSSH> to open a SSH connection
 using I<password authentication> instead of asymmetric cryptography:
@@ -763,7 +604,8 @@ when executed produces an output like this:
   hello world!
 
 
-=item Example 2
+
+=item Example 2: X11 forwarding
 
 The argument associated with C<command> can be a string. 
 The following example initiates a SSH connection with the remote machine
@@ -796,7 +638,7 @@ It will produce an output like:
 and I<a graphics clock will pop-up on your window>.
 
 
-=item Example 3
+=item Example 3: I<Debugging> L<GRID::Machine> programs
 
 Another example of use of the C<command> option is to put the remote
 side on I<debugging> mode:
@@ -832,7 +674,7 @@ The prompt of the debugger will appear in the netcat terminal
 =back 
 
 
-=item * debug
+=head4 debug
 
 The value must be a port number higher than 1024. Used to run the remote
 side under the control of the debugger. See the section L<REMOTE DEBUGGING>
@@ -843,7 +685,7 @@ side under the control of the debugger. See the section L<REMOTE DEBUGGING>
         includes => [ qw{SomeFunc} ],
      );
 
-=item * survive
+=head4 survive
 
 No exception will be produced if the connection fails.
 Instead C<undef> is returned. Often used when building several L<GRID::Machines>
@@ -876,7 +718,6 @@ and you don't care (too much) if one of them fails::
 
   print Dumper($c->suma_areas(args => [ map {  [$_, $N, $np] } 0..$np-1 ]));
 
-=back
 
 =head2 The C<eval> Method
 
@@ -3805,6 +3646,195 @@ exports these functions:
 =item * C<qc>
 
 =back
+
+=head1 INSTALLATION
+
+To install L<GRID::Machine> follow the traditional steps:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+=head2 Using Password Authentication
+
+You can make L<GRID::Machine> to work without automatic authentication.
+
+
+The following example uses L<Net::OpenSSH> to open a SSH connection
+using I<password authentication> instead of asymmetric cryptography:
+
+  $ cat -n openSSH.pl 
+     1  use strict;
+     2  use warnings;
+     3  use Net::OpenSSH;
+     4  use GRID::Machine;
+     5  
+     6  my $host = (shift() or $ENV{GRID_REMOTE_MACHINE});
+     7  my @ARGS;
+     8  push @ARGS, (user      => $ENV{USR})   if $ENV{USR};
+     9  push @ARGS, ( password => $ENV{PASS}) if $ENV{PASS};
+    10  
+    11  my $ssh = Net::OpenSSH->new($host, @ARGS); 
+    12  $ssh->error and die "Couldn't establish SSH connection: ". $ssh->error;
+    13  
+    14  my @cmd = $ssh->make_remote_command('perl');
+    15  { local $" = ','; print "@cmd\n"; }
+    16  my $grid = GRID::Machine->new(command => \@cmd);
+    17  my $r = $grid->eval('print "hello world!\n"');
+    18  print "$r\n";
+
+when executed produces an output like this:
+
+  $ perl openSSH.pl 
+  ssh,-S,/Users/localuser/.libnet-openssh-perl/user-machine-2413-275647,-o,User=user,--,machine,perl
+  hello world!
+
+
+
+However, it seems a bad idea to have unencrypted passwords messing around.
+It is much better to use asymmetric cryptography.
+
+
+=head2 Using Automatic authentication: Asymmetric Cryptography
+
+Set automatic ssh-authentication with the machines where you have an SSH account. 
+
+SSH includes the ability to authenticate users using public keys. Instead of 
+authenticating the user with a password, the SSH server on the remote machine will
+verify a challenge signed by the user's I<private key> against its copy
+of the user's I<public key>. To achieve this automatic ssh-authentication
+you have to:
+
+=over 2
+
+=item * Generate a public key use the C<ssh-keygen> utility. For example:
+
+  local.machine$ ssh-keygen -t rsa -N ''
+
+The option C<-t> selects the type of key you want to generate.
+There are three types of keys: I<rsa1>, I<rsa> and I<dsa>.
+The C<-N> option is followed by the I<passphrase>. The C<-N ''> setting
+indicates that no pasphrase will be used. This is useful when used 
+with key restrictions or when dealing with cron jobs, batch 
+commands and automatic processing which is the context in which this 
+module was designed.
+If still you don't like to have a private key without passphrase, 
+provide a passphrase and use C<ssh-agent> 
+to avoid the inconvenience of typing the passphrase each time. 
+C<ssh-agent> is a program you run once per login sesion and load your keys into.
+From that moment on, any C<ssh> client will contact C<ssh-agent>
+and no more passphrase typing will be needed.
+
+By default, your identification will be saved in a file C</home/user/.ssh/id_rsa>.
+Your public key will be saved in C</home/user/.ssh/id_rsa.pub>.
+
+=item * Once you have generated a key pair, you must install the public key on the 
+remote machine. To do it, append the public component of the key in
+
+           /home/user/.ssh/id_rsa.pub
+
+to file 
+
+           /home/user/.ssh/authorized_keys
+           
+on the remote machine.
+If the C<ssh-copy-id> script is available, you can do it using:
+
+  local.machine$ ssh-copy-id -i ~/.ssh/id_rsa.pub user@remote.machine
+
+Alternatively you can write the following command:
+
+  $ ssh remote.machine "umask 077; cat >> .ssh/authorized_keys" < /home/user/.ssh/id_rsa.pub
+
+The C<umask> command is needed since the SSH server will refuse to 
+read a C</home/user/.ssh/authorized_keys> files which have loose permissions.
+
+=item * Edit your local configuration file C</home/user/.ssh/config> (see C<man ssh_config> 
+in UNIX) and create a new section for C<GRID::Machine> connections to that host.
+Here follows an example:
+
+
+ ...
+
+ # A new section inside the config file: 
+ # it will be used when writing a command like: 
+ #                     $ ssh gridyum 
+
+ Host gridyum
+
+ # My username in the remote machine
+ user my_login_in_the_remote_machine
+
+ # The actual name of the machine: by default the one provided in the
+ # command line
+ Hostname real.machine.name
+
+ # The port to use: by default 22
+ Port 2048
+
+ # The identitiy pair to use. By default ~/.ssh/id_rsa and ~/.ssh/id_dsa
+ IdentityFile /home/user/.ssh/yumid
+
+ # Useful to detect a broken network
+ BatchMode yes
+
+ # Useful when the home directory is shared across machines,
+ # to avoid warnings about changed host keys when connecting
+ # to local host
+ NoHostAuthenticationForLocalhost yes
+
+
+ # Another section ...
+ Host another.remote.machine an.alias.for.this.machine
+ user mylogin_there
+
+ ...
+
+This way you don't have to specify your I<login> name on the remote machine even if it
+differs from your  I<login> name in the local machine, you don't have to specify the 
+I<port> if it isn't 22, etc. This is the I<recommended> way to work with C<GRID::Machine>.
+Avoid cluttering the constructor C<new>.
+
+=item * Once the public key is installed on the server you should be able to
+authenticate using your private key
+
+  $ ssh remote.machine
+  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686
+  Last login: Sat Jul  7 13:34:00 2007 from local.machine
+  user@remote.machine:~$                                 
+
+You can also automatically execute commands in the remote server:
+
+  local.machine$ ssh remote.machine uname -a
+  Linux remote.machine 2.6.15-1-686-smp #2 SMP Mon Mar 6 15:34:50 UTC 2006 i686 GNU/Linux
+
+=item * Once you have installed L<GRID::Machine> you can check that C<perl> can
+be executed in that machine using this one-liner:
+
+  $ perl -e 'use GRID::Machine qw(is_operative); print is_operative("ssh", "beowulf")."\n"'
+  1
+
+=back
+
+
+
+
+
+
+=head1 DEPENDENCIES
+
+This module requires these other modules and libraries:
+
+=over 2
+
+=item *  L<Module::Which> 
+
+=item *  L<Net::OPenSSH> is not needed but recommended. See section
+L</"Using Password Authentication">.
+
+=back 
+
 
 
 =head1 SEE ALSO
