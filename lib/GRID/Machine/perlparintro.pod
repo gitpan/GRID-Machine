@@ -736,15 +736,18 @@ add it to our pool of resources?
 
 =item * L<GRID::Machine::IOHandle>
 
+=item * L<GRID::Machine::Group>
+
+=item * L<GRID::Machine::Process>
+
 =item * L<GRID::Machine::perlparintro>
 
-=item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/Machine.dvi>
 
-=item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/perlparintro.dvi>
-
-=item * L<http://nereida.deioc.ull.es/~pp2/GRID_Machine/remotedebugtut.dvi>
+=item *  L<Net::OpenSSH> 
 
 =item * L<IPC::PerlSSH>
+
+=item * L<IPC::PerlSSH::Async>
 
 =item * Man pages of C<ssh>, C<ssh-key-gen>, C<ssh_config>, C<scp>, 
 C<ssh-agent>, C<ssh-add>, C<sshd>
