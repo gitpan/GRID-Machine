@@ -123,12 +123,12 @@ sub send_result {
     my $cleanup = $args{cleanup};
     $cleanup = 1 unless defined($cleanup);
 
-    my $host = $args{host} || $ENV{HOSTNAME}; 
-    unless ($host) {
+    my $host = $args{host};
+    unless (defined($host)) {
       eval q{
         require Sys::Hostname;
       };
-      $host = $@? 'unknown' : Sys::Hostname::hostname();
+      $host = $@? '$unknown' : Sys::Hostname::hostname();
     }
 
     my $startdir = $args{startdir};

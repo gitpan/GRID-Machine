@@ -29,7 +29,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = '0.121';
+our $VERSION = '0.122';
 
 my %_taken_id;
 {
@@ -283,7 +283,7 @@ EOREMOTE
 
            @command = ( $c );
         }
-        else {
+        elsif ($opts{host})  {
            $host = $opts{host} or
               die __PACKAGE__."->new() requires a host, a command or a Readfunc/Writefunc pair";
 
@@ -357,6 +357,37 @@ HELPMSG
            }
            else {
              @command = ( $ssh, @sshoptions, $host, $opts{perl} || "perl", @perloptions );
+           }
+        }
+        else { # not host not command: no ssh. IS a local open2!!!
+           $host = '';
+           $ssh = '';
+           $sshpipe = '';
+           $port = '';
+
+           $scp = $opts{scp} || "cp"; # unix
+
+           my @perloptions;
+           if (reftype($perloptions) && (reftype($perloptions) eq 'ARRAY')) {
+             push @perloptions, @$perloptions;
+           }
+           elsif ($perloptions) {
+             push @perloptions, split /\s+/, $perloptions;
+           }
+
+           if ($portdebug && $portdebug =~ /^\d+$/) {
+             my $perl = qq{PERLDB_OPTS="RemotePort=localhost:$portdebug" }.($opts{perl} || 'perl -d');
+             @command = ( "$perl @perloptions" );
+             print <<"HELPMSG";
+Debugging with '@command', run netcat:
+     netcat -v -l -p $portdebug
+or, better, if you have 'socat' installed:
+     socat -d READLINE,history=\$HOME/.perldbhistory TCP4-LISTEN:$portdebug,reuseaddr
+
+HELPMSG
+           }
+           else {
+             @command = ( $opts{perl} || "perl", @perloptions );
            }
         }
 
@@ -881,6 +912,8 @@ sub _get_result_or_callback {
 sub is_operative {
   my $ssh = shift;
   my $host = shift;
+  $ssh = '' if $host eq '';
+
   my $command = shift || 'perl -v';
   my $seconds = shift || 15;
 

@@ -26,10 +26,10 @@ sub e2r {
 
 my $debug = @ARGV ? 1234 : 0;
 
-my $host = $ENV{GRID_REMOTE_MACHINE};
+my $host = $ENV{GRID_REMOTE_MACHINE} || '';
 SKIP: {
-  skip "Remote not operative or Test::Exception not installed", $numtests-1 unless $host 
-                           and $test_exception_installed and is_operative('ssh', $host);
+  skip "Remote not operative or Test::Exception not installed", $numtests-1 unless 
+                           $test_exception_installed and is_operative('ssh', $host);
 
    my $machine;
    Test::Exception::lives_ok {

@@ -3,10 +3,10 @@ use strict;
 use Test::More tests => 12;
 BEGIN { use_ok('GRID::Machine', 'is_operative') };
 
-my $host = $ENV{GRID_REMOTE_MACHINE};
+my $host = $ENV{GRID_REMOTE_MACHINE} || '';
 
 SKIP: {
-    skip "Remote not operative", 11 unless ($host and is_operative('ssh', $host) and ( $^O eq 'linux'));
+    skip "Remote not operative", 11 unless is_operative('ssh', $host) and ($^O =~ /darwin|linux/);
 
     my $m = GRID::Machine->new( host => $host );
 

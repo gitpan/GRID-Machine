@@ -36,6 +36,8 @@ BEGIN {
 }
 
 my @MACHINE_NAMES = split /\s+/, $ENV{MACHINES} || '';
+@MACHINE_NAMES = ('', '') unless @MACHINE_NAMES;
+
 
 SKIP: {
   skip "t/smallpar.pl not found", $nt2 unless (@MACHINE_NAMES && $ENV{DEVELOPER} && -r "t/smallpar.pl");

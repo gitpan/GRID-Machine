@@ -28,7 +28,7 @@ sub MY::postamble {
   return '' unless $DEVELOPER;
 
   # To check tests in remote machines. See goal remotetest
-  my $MACHINES = ($ENV{MACHINES} || '127.0.0.1 127.0.0.2');
+  my $MACHINES = ($ENV{MACHINES} || '127.0.0.1 127.0.0.1');
 
   return targets(
     MACHINES     => $MACHINES,

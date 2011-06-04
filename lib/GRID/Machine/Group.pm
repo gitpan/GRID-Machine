@@ -66,6 +66,11 @@ sub calloreval {
 
   my ($next, $thereareargs, $reset);
 
+  unless (@{$self->{machines}}) {
+    warn "Warning! Attempt to execute '$name' in an empty cluster!";
+    return;
+  }
+
   # replicate is ignored if 'arg' is defined
   unless (defined($arg)) {
     my $rep = $ARG{replicate};
@@ -153,6 +158,7 @@ sub calloreval {
 sub sub {
   my $self = shift;
 
+  warn "Warning!: Attempt to install sub '$_[0]' in an empty cluster" unless @{$self->{machines}};
   my @r;
   push @r, $_->sub(@_) for @{$self->{machines}};
 
@@ -170,6 +176,7 @@ sub sub {
 sub makemethod {
   my $self = shift;
 
+  warn "Warning!: Attempt to install makemethod '$_[0]' in an empty cluster" unless @{$self->{machines}};
   my @r;
   push @r, $_->makemethod(@_) for @{$self->{machines}};
 

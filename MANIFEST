@@ -23,6 +23,9 @@ t/17thom_mani.t
 t/18mannierrcode.t
 t/19syntaxerr.t
 t/20group.t
+t/21group.t
+t/22localsynopsis.t
+t/23localincludes.t
 
 t/pi.pl
 t/pi2.pl

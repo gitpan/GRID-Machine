@@ -4,7 +4,7 @@ use GRID::Machine;
 use GRID::Machine::Group;
 use List::Util qw(sum);
 
-my $host = $ENV{GRID_REMOTE_MACHINE}; 
+my $host = $ENV{GRID_REMOTE_MACHINE} || ''; 
 my $code = << 'EOFUNCTION';
    double sigma(int id, int N, int np) {
      double sum = 0;

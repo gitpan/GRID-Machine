@@ -3,10 +3,10 @@ use strict;
 use Test::More tests => 2;
 BEGIN { use_ok('GRID::Machine', qw(is_operative qc)) };
 
-my $host = $ENV{GRID_REMOTE_MACHINE};
+my $host = $ENV{GRID_REMOTE_MACHINE} || '';
 
 SKIP: {
-  skip "Remote not operative", 1 unless ($host and is_operative('ssh', $host));
+  skip "Remote not operative", 1 unless ($^O =~ /darwin|nix/) && is_operative('ssh', $host);
 
 ########################################################################
 
@@ -14,7 +14,7 @@ SKIP: {
         host => $host,
         cleanup => 1,
         sendstdout => 1,
-        startdir => 'tutu',
+        startdir =>  '/tmp/tutu',
      );
 
   my $s1 = $machine->eval(q{ print "one\nTwo\n" })->stdout;

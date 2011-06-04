@@ -4,7 +4,8 @@ use GRID::Machine;
 use GRID::Machine::Group;
 use List::Util qw(sum);
 
-my @MACHINE_NAMES = split /\s+/, $ENV{MACHINES};
+my @MACHINE_NAMES = split /\s+/, ($ENV{MACHINES} || '');
+@MACHINE_NAMES = ('', '') unless @MACHINE_NAMES;
 my $c = GRID::Machine::Group->new(cluster => [ @MACHINE_NAMES ]);
 
 $c->sub(suma_areas => q{

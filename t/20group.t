@@ -39,7 +39,8 @@ BEGIN {
   $test_exception_installed = 0 if $@;
 }
 
-my @MACHINE_NAMES = split /\s+/, $ENV{MACHINES} || '';
+my @MACHINE_NAMES = split /\s+/, ($ENV{MACHINES} || '');
+@MACHINE_NAMES = ('', '') unless @MACHINE_NAMES;
 
 SKIP: {
   skip "t/pi.pl not found", $nt2 unless (@MACHINE_NAMES && $ENV{DEVELOPER} && -x "t/pi.pl");
@@ -78,12 +79,12 @@ SKIP: {
   like($r, $expected,'Computing pi in parallel. Lazy arguments');
 }
 
-my $host = $ENV{GRID_REMOTE_MACHINE}; 
+my $host = ($ENV{GRID_REMOTE_MACHINE} || ''); 
 my $operative = 0;
-$operative = is_operative('ssh', $host,'perldoc -l Inline::C') if ($host && $ENV{DEVELOPER});;
+$operative = is_operative('ssh', $host,'perldoc -l Inline::C') if $ENV{DEVELOPER};
 SKIP: {
   ##  mmm requires Inline::C installed in the remote machine
-  skip "t/pi4.pl not found", $nt5 unless ($host && $ENV{DEVELOPER} && -r "t/pi4.pl" && $operative);
+  skip "t/pi4.pl not found", $nt5 unless ($ENV{DEVELOPER} && -r "t/pi4.pl" && $operative);
 
   my $r = qx{perl -I./lib/ t/pi4.pl 2>&1};
   
@@ -91,7 +92,7 @@ SKIP: {
 ^\s* 3.14\d*.\s*$
 }x;
 
-  like($r, $expected,"Computing pi in $host. Using Inline::C with a single machine");
+  like($r, $expected,"Computing pi in '$host'. Using Inline::C with a single machine");
 }
 
 

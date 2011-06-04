@@ -10,12 +10,12 @@ BEGIN {
   $test_exception_installed = 0 if $@;
 }
 
-my $host = $ENV{GRID_REMOTE_MACHINE};
+my $host = $ENV{GRID_REMOTE_MACHINE} || '';
 
 my $machine;
 SKIP: {
     skip "Remote not operative or Test::Exception not installed", 5
-  unless $test_exception_installed and $host and is_operative('ssh', $host);
+  unless $test_exception_installed and is_operative('ssh', $host);
 
 ########################################################################
 
