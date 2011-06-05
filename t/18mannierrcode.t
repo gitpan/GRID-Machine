@@ -15,6 +15,7 @@ BEGIN {
  eval { require Test::Exception };
  $test_exception_installed = 0 if $@;
 }
+use File::Spec;
 
 sub e2r {
   local $_ = shift;
@@ -30,14 +31,15 @@ my $host = $ENV{GRID_REMOTE_MACHINE} || '';
 SKIP: {
   skip "Remote not operative or Test::Exception not installed", $numtests-1 unless $test_exception_installed and is_operative('ssh', $host);
 
+   my $tmpdir = File::Spec->tmpdir();
    my $m;
    Test::Exception::lives_ok {
      $m = GRID::Machine->new(
         host => $host,
-        prefix => '/tmp/perl5lib',                                                          
-        startdir => '/tmp',                                                                               
-        log => '/tmp/rperl$$.log',                                                                                           
-        err => '/tmp/rperl$$.err',                                                                                
+        prefix => "$tmpdir/perl5lib",                                                          
+        startdir => $tmpdir,                                                                               
+        log => $tmpdir.'/rperl$$.log',                                                                                           
+        err => $tmpdir.'/rperl$$.err',                                                                                
         debug => $debug,
         cleanup => 1,                                                                                 
         sendstdout => 1
@@ -46,14 +48,14 @@ SKIP: {
 
   my $r = $m->system("anunknowncommand");
 
-  my $expected = e2r(q{Can't exec "anunknowncommand":});
+  my $expected = e2r(q{anunknowncommand});
   my $err = $r->stderr;
   $err =~s/\s+//g;
   like($err, $expected, q{Can't exec "anunknowncommand":});
 
   is($r->stdout, '', q{nothing in stdout});
 
-  is($r->errcode, -1, q{result is -1});
+  like($r->errcode, qr{-1|256}, q{result is -1});
 
   is($r->errmsg, '', q{errmsg is ''});
 

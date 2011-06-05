@@ -186,9 +186,16 @@ Also the port. I.e. it can be something like:
 
   my $machine = GRID::Machine->new(host => 'casiano@orion:2048');
 
-However, instead of specifying the user, port and other C<ssh> parameters here,
-the recommended way to work was explained in section 
-L<INSTALLATION>: insert a section inside the C</home/user/.ssh/config>
+If host is the empty string:
+
+  my $machine = GRID::Machine->new(host => '');
+
+a process executing C<perl> in the local machine is open via C<open2> (no SSH call will 
+be involved).
+
+Instead of specifying the user, port and other C<ssh> parameters here,
+the recommended way to work is to
+insert a section inside the C</home/user/.ssh/config>
 file:
 
  ...

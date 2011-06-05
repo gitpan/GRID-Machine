@@ -3,6 +3,7 @@ use warnings;
 use strict;
 
 use Data::Dumper;
+use File::Spec;
 
 my $numtests;
 BEGIN {
@@ -25,28 +26,31 @@ SKIP: {
       skip "Remote not operative or Test::Exception not installed", $numtests-1
     unless $test_exception_installed and is_operative('ssh', $host);
 
+   my $tmpdir = File::Spec->tmpdir();
    my $m;
    Test::Exception::lives_ok {
      $m = GRID::Machine->new(
           host => $host,
-          prefix => '/tmp/',
-          log => '/tmp',
-          err => '/tmp',
-          startdir => '/tmp/',
+          prefix => $tmpdir,
+          log => $tmpdir,
+          err => $tmpdir,
+          startdir => $tmpdir,
           #debug => 12344,
           wait => 10,
+          uses => [ 'Sys::Hostname' ],
     );
    } 'No fatals creating a GRID::Machine object';
 
-    my $r = $m->system("hostname");
+    my $r = $m->eval('hostname()');
     is($r->stderr, '', 'no errors');
 
-    $r = $m->system('pwd');
-    like($r, qr{/tmp}, 'pwd is /tmp');
+    $r = $m->getcwd->result;
+    my $rtd = quotemeta($tmpdir);
+    like($r, qr{$rtd}, "pwd is $tmpdir");
 
-    $r = $m->system('ls -l ') ;
-    like($r, qr{rperl\w+.err}, 'err file found in startdir');
-    like($r, qr{rperl\w+.log}, 'err file found in startdir');
+    $r = join "\n", $m->glob('rperl*')->Results ;
+    like($r, qr{rperl\w+.err}, "err file found in $tmpdir");
+    like($r, qr{rperl\w+.log}, "err file found in $tmpdir");
 }
 
 
