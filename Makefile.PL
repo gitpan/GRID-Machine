@@ -3,7 +3,7 @@ use strict;
 use ExtUtils::MakeMaker;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
-if ($ENV{DEVELOPER}) {
+if ($ENV{DEVELOPER} && -r 'makepods') {
   system(q{make -f makepods}) and warn "Something went wrong building pods: $?\n";
 }
 WriteMakefile(

@@ -4,6 +4,7 @@ use Scalar::Util qw{reftype};
 use File::Path;
 use Getopt::Long;
 use GRID::Machine qw{slurp_file};
+use Fcntl qw(:DEFAULT :flock);
 
 # Package Variables. The user can modify it inside the machine.preamble.pl
 # configuration file
@@ -14,13 +15,16 @@ our $makebuilder_arg = '';
 our $build_test_arg = '';
 our $build_arg = '';
 our $localpreamble = "local.preamble.pl";
+my  $report;
 our %preamble;
-our $separator = sub { 
-  my $self = shift;
 
-  my $host = $self->host;
-  "************$host************\n";
-};
+sub usage {
+  return <<'EOS'
+Usage:\n$0 [-- report reportfile ] distribution.tar.gz machine1 machine2 ... 
+
+  The null string machine '' will fork (via open2) a process executing perl in the local machine 
+EOS
+}
 
 my $m; # current machine
 my $tmpdir; # temporary directory in the remote machine
@@ -30,7 +34,7 @@ our $clean_files = sub {
   return unless UNIVERSAL::isa($m, 'GRID::Machine');
   my $r = $m->eval( q{
     our $tmpdir;
-    chdir "$tmpdir/.." || die "Can't chage to tmpdir/..";
+    CORE::chdir "$tmpdir/.." || die "Can't chage to $tmpdir ...";
     rmtree($tmpdir);
   });
   warn "Can't remove files in temporary directory <$tmpdir>: $r\n" unless $r->ok;
@@ -41,17 +45,16 @@ local $SIG{INT} = $SIG{PIPE} = sub {
   warn "Tests were interrupted by user!";
 };
 
-GetOptions ("localpreamble=s" => \$localpreamble);
+GetOptions ("localpreamble=s" => \$localpreamble, 'report=s' => \$report);
 
-my $dist = shift or die "Usage:\n$0 distribution.tar.gz machine1 machine2 ... \n";
+my $dist = shift or die usage();
 
 die "No distribution $dist found\n" unless -r $dist;
 
-  die "Distribution does not follow standard name convention\n" 
-unless $dist =~ m{([\w.-]+)\.tar\.gz$};
+die "Distribution does not follow standard name convention\n" unless $dist =~ m{([\w.-]+)\.tar\.gz$};
 my $dir = $1;
 
-die "Usage:\n$0 distribution.tar.gz machine1 machine2 ... \n" unless @ARGV;
+die usage() unless @ARGV;
 
 if (-r $localpreamble) {
   local $/ = undef;
@@ -61,7 +64,21 @@ if (-r $localpreamble) {
   warn("Error in $localpreamble $@. Local preamble skipped") if  $@;
 }
 
+
 for my $host (@ARGV) {
+
+  my $pid = fork();
+
+  next if $pid;
+
+  my $LOG = '';
+  my $prefix = sub {
+    my $str = shift;
+
+    $str =~ s/^/$host:/mg;
+    $LOG .= $str;
+    $str;
+  };
 
   $m = eval { 
     GRID::Machine->new(host => $host) 
@@ -107,10 +124,10 @@ for my $host (@ARGV) {
         $tar->extract() or die "Archive::Tar error: Can't extract distribution $dist\n";
       }
       else {
-        system("gunzip $dist") and die "Can't gunzip $dist\n";
+        CORE::system("gunzip $dist") and die "Can't gunzip $dist\n";
         my $tar = $dist;
         $tar =~ s/\.gz$//;
-        system('tar', '-xf', $tar) and die "Can't untar $tar\n";
+        CORE::system('tar', '-xf', $tar) and die "Can't untar $tar\n";
       }
     },
     $dist # arg for eval
@@ -123,13 +140,6 @@ for my $host (@ARGV) {
     next;
   };
 
-  if (reftype($separator) && (reftype($separator) eq 'CODE')) {
-    $separator = $separator->($m); 
-  }
-  else {
-    $separator = "\n++++++++++ $host +++++++++\n";
-  }
-  print $separator;
 
   unless ($makebuilder && $build) {
     ($makebuilder, $build) = $m->eval(q{
@@ -139,21 +149,34 @@ for my $host (@ARGV) {
     })->Results;
   }
 
-  $r = $m-> system("perl $makebuilder $makebuilder_arg");
-  print "$r";
+  $r = $m->system("perl $makebuilder $makebuilder_arg");
+  print $prefix->("$r");
   next if $r->stderr;
 
   $r = $m->system("$build $build_arg");
-  print "$r";
+  print $prefix->("$r");
   next if $r->stderr; 
 
   $r = $m->system("$build test $build_test_arg");
-  print $r;
+  print $prefix->("$r");
   warn "Errors while running tests in $host: $r\n" unless $r->ok;
 
   # Clean files
   $clean_files->();
+
+  if ($report) { 
+    open my $rf, '>', "$report.$host" or die "Can't open file log_$report.$host";
+      print $rf $LOG;
+      print $rf "\n";
+    close($rf);
+  }
+
+  exit(0);
 }
+
+wait for @ARGV;
+
+__END__
 
 =head1 NAME
 
@@ -164,6 +187,7 @@ remotetest.pl - make tests on a remote machine
 
   remotetest.pl MyInteresting-Dist-1.107.tar.gz machine1.domain machine2.domain
   remotetest.pl  -l some.preamble.pl MyInteresting-Dist-1.107.tar.gz machine1.domain ...
+  remotetest.pl  -rep reportfile MyInteresting-Dist-1.107.tar.gz machine1.domain ...
 
 =head1 MOTIVATION
 
@@ -270,18 +294,6 @@ arguments for C<make> or C<./Build>
 =item * C<$build_test_arg> 
 
 arguments for C<make test> or C<./Build test>
-
-=item * C<$separator> 
-
-A reference to a subroutine. The callback 
-is called with the C<GRID::Machine> object as only argument. It must return the 
-string that is used as a I<title> or I<header> for the report. The default callback returns
-the string:
-
-    "************$host************\n";
-
-being C<$host = $_[0]-E<gt>host> the name/IP of the current machine.
-
 
 =item * C<%preamble> 
 

@@ -29,7 +29,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = '0.123';
+our $VERSION = '0.124';
 
 my %_taken_id;
 {
@@ -995,7 +995,12 @@ sub put {
 
   # Check if @files exist in the local system
   # Check if they exist in the remote system. If so what permits they have?
-  system("$scp @files $host:$dest") and die "GRID::Machine::put Error: Copying files @files to $host:$dest\n";
+
+  # host is local?
+  $host = ($host eq '')? '' : "$host:";
+
+  system("$scp @files $host$dest") and die "GRID::Machine::put Error: Copying files @files to $host:$dest\n";
+
   return 1;
 }
 

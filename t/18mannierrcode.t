@@ -4,7 +4,7 @@ use warnings;
 
 my $numtests;
 BEGIN {
-    $numtests = 7;
+    $numtests = 6;
 }
 use Test::More tests => $numtests;
 BEGIN { use_ok('GRID::Machine', 'is_operative') };
@@ -48,10 +48,11 @@ SKIP: {
 
   my $r = $m->system("anunknowncommand");
 
-  my $expected = e2r(q{anunknowncommand});
-  my $err = $r->stderr;
-  $err =~s/\s+//g;
-  like($err, $expected, q{Can't exec "anunknowncommand":});
+  #my $expected = e2r(q{anunknowncommand});
+  #my $err = $r->stderr;
+  
+  #$err =~s/\s+//g;
+  #like($err, $expected, q{Can't exec "anunknowncommand":});
 
   is($r->stdout, '', q{nothing in stdout});
 
