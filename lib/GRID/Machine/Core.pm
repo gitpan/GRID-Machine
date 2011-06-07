@@ -78,10 +78,11 @@ EOPROG
   $program =~ s/<<\$exec>>/$exec/g;
   $program =~ s/<<\$scriptname>>/$scriptname/g;
 
-  print $tmp $program;
+  print($tmp $program) or die "Can't create script $scriptname";
 
   #push @{SERVER->cleanfiles}, $scriptname; # unless shift();
-  close($tmp);
+  close($tmp) or die "Can't close file $scriptname";
+
   return $scriptname;
 }
 

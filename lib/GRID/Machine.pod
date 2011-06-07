@@ -1534,6 +1534,10 @@ of machine C<beowulf>:
 The negative answer for the second execution is due to the fact that no command
 called C<chum> is available on that machine.
 
+If C<$machine> is the empty string i.e. C<$machine eq ''>, 
+it refers to a direct connection to the local machine and thus,
+it succeeds most of the time.
+
 =head2 The Function C<qc>
 
 Prefixes the string passed as argument with the string C<#line $LINE $FILE> where C<$LINE>

@@ -29,7 +29,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = '0.124';
+our $VERSION = '0.125';
 
 my %_taken_id;
 {
@@ -1239,11 +1239,12 @@ sub openpipe {
 
   my $scriptname = $r->result;
 
-  my $command = "$ssh $host perl $scriptname";
+  my $perl = ($host eq '')? $^X : 'perl';
+  my $command = "$ssh $host $perl $scriptname";
   $command = $mode? "$command |" : "| $command";
 
   my $proc = IO::File->new;
-  my $pid = open($proc, $command) || die "Can't open <$ssh $host perl $scriptname>\n";
+  my $pid = open($proc, $command) || die "Can't open <$ssh $host $perl $scriptname>\n";
 
   push @{$self->{PROCESSPIDS}}, $pid;
 

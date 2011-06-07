@@ -18,7 +18,7 @@ $c->sub(suma_areas => q{
    $sum /= $N; 
 });
 
-my ($N, $np, $pi)  = (1000, 4, 0);
+my ($N, $np, $pi)  = (shift || 1000, 4, 0);
 
 {
   my $count = 0;

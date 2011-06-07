@@ -35,7 +35,7 @@ SKIP: {
    Test::Exception::lives_ok {
      $machine = GRID::Machine->new(
         host => $host,
-        prefix => '/tmp/perl5lib',                                                          
+        #prefix => "/tmp/perl5lib$$",                                                          
         startdir => '/tmp',                                                                               
         log => '/tmp/rperl$$.log',                                                                                           
         err => '/tmp/rperl$$.err',                                                                                

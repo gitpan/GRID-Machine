@@ -11,13 +11,13 @@ SKIP: {
     my $m = GRID::Machine->new( host => $host );
 
     my $i;
-    my $f = $m->open('| sort -n > /tmp/sorted.txt');
+    my $f = $m->open("| sort -n > /tmp/sorted$$.txt");
     for($i=10; $i>=0;$i--) {
       $f->print("$i\n")
     }
     $f->close();
 
-    my $g = $m->open('/tmp/sorted.txt');
+    my $g = $m->open("/tmp/sorted$$.txt");
     for($i=0; $i<=10; $i++) {
       my $found = <$g>;
       is($found, "$i\n", "$i in position");

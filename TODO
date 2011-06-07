@@ -1,12 +1,12 @@
-* GRID::Machine machines with names $_... will be the local machine. 
-       no SSH connection, simply open2
+* make dist in remotetest.pl if not done
 * number of cores in a machine.
-  modify "call" accordingly
-  copy from GRID::cluster
+    modify "call" accordingly
+    copy from GRID::cluster
+
 * use Net::OpenSSH
 
 * errors in the REMOTE code due to 'use' etc. errors appear as a premature closed filenadle 
-  fix this. Produce an accurate error message
+  fix this. Produce an accurate error message. Make a PIPE signal handler and display the error?
 
 * Inline::C cache the program at the start in the remote machine
 

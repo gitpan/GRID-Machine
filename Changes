@@ -1,3 +1,6 @@
+0.124
+  * Allow GRID::Machine objects to extend simple Unix processes: 
+         no SSH connection, simply open2
 0.111
     * gmdb. Remote debug
     * added mani.pl to tests

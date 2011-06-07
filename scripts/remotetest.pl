@@ -16,36 +16,38 @@ our $build_test_arg = '';
 our $build_arg = '';
 our $localpreamble = "local.preamble.pl";
 my  $report;
+my $parallel;
 our %preamble;
+
+  my $m; # current machine
+  my $tmpdir; # temporary directory in the remote machine
+
+  our $clean_files = sub {
+    # Clean files
+    return unless UNIVERSAL::isa($m, 'GRID::Machine');
+    my $r = $m->eval( q{
+      our $tmpdir;
+      CORE::chdir "$tmpdir/.." || die "Can't chage to $tmpdir ...";
+      rmtree($tmpdir);
+    });
+    warn "Can't remove files in temporary directory <$tmpdir>: $r\n" unless $r->ok;
+  };
+
+
+  local $SIG{INT} = $SIG{PIPE} = sub { 
+    $clean_files->(); 
+    warn "Tests were interrupted!";
+  };
 
 sub usage {
   return <<'EOS'
-Usage:\n$0 [-- report reportfile ] distribution.tar.gz machine1 machine2 ... 
+Usage:\n$0 [--report reportfile ] [--parallel] distribution.tar.gz machine1 machine2 ... 
 
   The null string machine '' will fork (via open2) a process executing perl in the local machine 
 EOS
 }
 
-my $m; # current machine
-my $tmpdir; # temporary directory in the remote machine
-
-our $clean_files = sub {
-  # Clean files
-  return unless UNIVERSAL::isa($m, 'GRID::Machine');
-  my $r = $m->eval( q{
-    our $tmpdir;
-    CORE::chdir "$tmpdir/.." || die "Can't chage to $tmpdir ...";
-    rmtree($tmpdir);
-  });
-  warn "Can't remove files in temporary directory <$tmpdir>: $r\n" unless $r->ok;
-};
-
-local $SIG{INT} = $SIG{PIPE} = sub { 
-  $clean_files->(); 
-  warn "Tests were interrupted by user!";
-};
-
-GetOptions ("localpreamble=s" => \$localpreamble, 'report=s' => \$report);
+GetOptions ("localpreamble=s" => \$localpreamble, 'report=s' => \$report, parallel => \$parallel);
 
 my $dist = shift or die usage();
 
@@ -67,9 +69,10 @@ if (-r $localpreamble) {
 
 for my $host (@ARGV) {
 
-  my $pid = fork();
-
-  next if $pid;
+  if ($parallel) {
+    my $pid = fork();
+    next if $pid;
+  }
 
   my $LOG = '';
   my $prefix = sub {
@@ -151,11 +154,11 @@ for my $host (@ARGV) {
 
   $r = $m->system("perl $makebuilder $makebuilder_arg");
   print $prefix->("$r");
-  next if $r->stderr;
+  next if !$r->ok && $r->stderr;
 
   $r = $m->system("$build $build_arg");
   print $prefix->("$r");
-  next if $r->stderr; 
+  next if !$r->ok && $r->stderr;
 
   $r = $m->system("$build test $build_test_arg");
   print $prefix->("$r");
@@ -171,10 +174,12 @@ for my $host (@ARGV) {
     close($rf);
   }
 
-  exit(0);
+  exit(0) if $parallel;
 }
 
-wait for @ARGV;
+if ($parallel) {
+  wait for @ARGV;
+}
 
 __END__
 
