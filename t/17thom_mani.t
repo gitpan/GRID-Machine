@@ -2,6 +2,12 @@
 use warnings;
 use strict;
 
+sub findVersion {
+  my $pv = `perl -v`;
+  my ($v) = $pv =~ /v(\d+\.\d+)\.\d+/;
+
+  $v ? $v : 0;
+}
 use Data::Dumper;
 use File::Spec;
 
@@ -24,7 +30,7 @@ BEGIN {
 my $host = $ENV{GRID_REMOTE_MACHINE} || '';
 SKIP: {
       skip "Remote not operative or Test::Exception not installed", $numtests-1
-    unless $test_exception_installed and is_operative('ssh', $host);
+    unless $test_exception_installed and  (findVersion() > 5.6) && is_operative('ssh', $host);
 
    my $tmpdir = File::Spec->tmpdir();
    my $m;

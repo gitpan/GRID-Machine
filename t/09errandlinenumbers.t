@@ -1,6 +1,12 @@
 #!/usr/local/bin/perl -w
 use strict;
 use Test::More tests => 7;
+sub findVersion {
+  my $pv = `perl -v`;
+  my ($v) = $pv =~ /v(\d+\.\d+)\.\d+/;
+
+  $v ? $v : 0;
+}
 BEGIN { use_ok('GRID::Machine', qw(is_operative qc)) };
 
 my $test_exception_installed;
@@ -15,7 +21,7 @@ my $host = $ENV{GRID_REMOTE_MACHINE} || '';
 
 SKIP: {
     skip "Remote not operative or Test::Exception not installed", 6
-  unless $test_exception_installed and is_operative('ssh', $host);
+  unless (findVersion() > 5.6) and $test_exception_installed and is_operative('ssh', $host);
 
 ########################################################################
 
@@ -36,7 +42,7 @@ SKIP: {
 
   my $expected = qr{
       Error\s+while\s+compiling\s+eval\s+'.q\s+=\s+shift;\s+.q->.fam...'\s+
-      Global\s+symbol\s+".q"\s+requires\s+explicit\s+package\s+name\s+at\s+t/09errandlinenumbers.t\s+line\s+33,
+      Global\s+symbol\s+".q"\s+requires\s+explicit\s+package\s+name\s+at\s+t/09errandlinenumbers.t\s+line\s+39
   }xs;
 
   my $err = $r->errmsg;

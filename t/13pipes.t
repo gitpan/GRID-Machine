@@ -1,5 +1,11 @@
 #!/usr/local/bin/perl -w
 use strict;
+sub findVersion {
+  my $pv = `perl -v`;
+  my ($v) = $pv =~ /v(\d+\.\d+)\.\d+/;
+
+  $v ? $v : 0;
+}
 use Test::More tests => 15;
 BEGIN { use_ok('GRID::Machine', 'is_operative') };
 
@@ -14,6 +20,7 @@ my $host = $ENV{GRID_REMOTE_MACHINE} || '';
 
 SKIP: {
     skip "Remote not operative or Test::Exception isn't installed or no linux", 14 unless 
+      (findVersion() > 5.6) && 
       $test_exception_installed and is_operative('ssh', $host) and ( $^O =~ /linux|darwin/);
 
     my $m;

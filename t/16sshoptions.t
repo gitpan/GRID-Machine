@@ -1,6 +1,12 @@
 #!/usr/local/bin/perl -w
 # Provided by Alex White. Thanks Alex!
 use strict;
+sub findVersion {
+  my $pv = `perl -v`;
+  my ($v) = $pv =~ /v(\d+\.\d+)\.\d+/;
+
+  $v ? $v : 0;
+}
 my $numtests;
 BEGIN {
 $numtests = 3;
@@ -21,7 +27,7 @@ my $host = $ENV{GRID_REMOTE_MACHINE};
 my $machine;
 SKIP: {
    skip "Remote not operative or Test::Exception not installed", $numtests-1
- unless $test_exception_installed and $host and is_operative('ssh', $host);
+ unless $test_exception_installed and  (findVersion() > 5.6) && is_operative('ssh', $host);
 
    my $ssh_options = [ '-o', "RemoteForward=localhost:12348 localhost:12349" ];
 
