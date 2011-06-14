@@ -21,7 +21,7 @@ my $host = $ENV{GRID_REMOTE_MACHINE} || '';
 my $machine;
 SKIP: {
     skip "Remote not operative or Test::Exception not installed", 5
-  unless (findVersion() > 5.6) and $test_exception_installed and is_operative('ssh', $host);
+  unless $host and  $test_exception_installed and is_operative('ssh', $host);
 
 ########################################################################
 

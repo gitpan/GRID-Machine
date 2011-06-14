@@ -1,12 +1,5 @@
 #!/usr/local/bin/perl -w
 use strict;
-sub findVersion {
-  my $pv = `perl -v`;
-  my ($v) = $pv =~ /v(\d+\.\d+)\.\d+/;
-
-  $v ? $v : 0;
-}
-
 our (
 $nt, 
 $nt2,
@@ -44,9 +37,19 @@ BEGIN {
 my @MACHINE_NAMES = split /\s+/, $ENV{MACHINES} || '';
 @MACHINE_NAMES = ('', '') unless @MACHINE_NAMES;
 
+my $host = ($ENV{GRID_REMOTE_MACHINE} || ''); 
+my $operative = 0;
+if ($ENV{DEVELOPER}) {
+  $operative = is_operative('ssh', $host,'perldoc -l Inline::C');
+
+  for (@MACHINE_NAMES) {
+    $operative = ($operative and is_operative('ssh', $_));
+  }
+}
+
 
 SKIP: {
-  skip "t/smallpar.pl not found", $nt2 unless ( (findVersion() > 5.6) && @MACHINE_NAMES && -r "t/smallpar.pl");
+  skip "t/smallpar.pl not found", $nt2 unless ( $host && $operative &&  @MACHINE_NAMES && -r "t/smallpar.pl");
 
   my $r = qx{perl -I./lib/ t/smallpar.pl 2>&1};
   $r = eval $r;
@@ -74,7 +77,7 @@ SKIP: {
 
 
 SKIP: {
-  skip "t/smallpar1.pl not found", $nt3 unless ( (findVersion() > 5.6) && @MACHINE_NAMES && -r "t/smallpar1.pl");
+  skip "t/smallpar1.pl not found", $nt3 unless ( $host && $operative &&  @MACHINE_NAMES && -r "t/smallpar1.pl");
 
   my $r = qx{perl -I./lib/ t/smallpar1.pl 2>&1};
   $r = eval $r;
@@ -101,7 +104,7 @@ SKIP: {
 }
 
 SKIP: {
-  skip "t/smallpar3.pl not found", $nt4 unless ( (findVersion() > 5.6) && @MACHINE_NAMES && -r "t/smallpar3.pl");
+  skip "t/smallpar3.pl not found", $nt4 unless ( $host && $operative &&  @MACHINE_NAMES && -r "t/smallpar3.pl");
 
   my $r = qx{perl -I./lib/ t/smallpar3.pl 2>&1};
   $r = eval $r;
@@ -143,7 +146,7 @@ SKIP: {
 }
 
 SKIP: {
-  skip "t/smallpar4.pl not found", $nt4 unless (@MACHINE_NAMES && (findVersion() > 5.6) && -r "t/smallpar4.pl");
+  skip "t/smallpar4.pl not found", $nt4 unless ($host && @MACHINE_NAMES && $operative &&  -r "t/smallpar4.pl");
 
   my $r = qx{perl -I./lib/ t/smallpar4.pl 2>&1};
   $r = eval $r;

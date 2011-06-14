@@ -29,7 +29,7 @@ use GRID::Machine::MakeAccessors; # Order is important. This must be the first!
 use GRID::Machine::Message;
 use GRID::Machine::Result;
 
-our $VERSION = '0.126';
+our $VERSION = '0.127';
 
 my %_taken_id;
 {
@@ -911,7 +911,7 @@ sub _get_result_or_callback {
 # Eric version. Thanks Eric!
 sub is_operative {
   my $ssh = shift;
-  my $host = shift;
+  my $host = (shift || '');
   $ssh = '' if $host eq '';
 
   my $command = shift || 'perl -v';

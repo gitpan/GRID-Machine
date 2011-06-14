@@ -1,12 +1,5 @@
 #!/usr/local/bin/perl -w
 use strict;
-sub findVersion {
-  my $pv = `perl -v`;
-  my ($v) = $pv =~ /v(\d+\.\d+)\.\d+/;
-
-  $v ? $v : 0;
-}
-
 our (
 $nt, 
 $nt2,
@@ -48,8 +41,18 @@ BEGIN {
 my @MACHINE_NAMES = split /\s+/, ($ENV{MACHINES} || '');
 @MACHINE_NAMES = ('', '') unless @MACHINE_NAMES;
 
+my $host = ($ENV{GRID_REMOTE_MACHINE} || ''); 
+my $operative = 0;
+if ($ENV{DEVELOPER}) {
+  $operative = is_operative('ssh', $host,'perldoc -l Inline::C');
+
+  for (@MACHINE_NAMES) {
+    $operative = ($operative and is_operative('ssh', $_));
+  }
+}
+
 SKIP: {
-  skip "t/pi.pl not found", $nt2 unless ( (findVersion() > 5.6) && @MACHINE_NAMES && -x "t/pi.pl");
+  skip "t/pi.pl not found", $nt2 unless ( $host && $operative &&  @MACHINE_NAMES && -x "t/pi.pl");
 
   my $r = qx{perl -I./lib/ t/pi.pl 2>&1};
   
@@ -61,7 +64,7 @@ Pi\s+=\s+ 3.14\d*.\s+N\s+=\s+1000\s+Time\s+=\s+\d+.?\d*
 }
 
 SKIP: {
-  skip "t/pi2.pl not found", $nt3 unless ( (findVersion() > 5.6) && @MACHINE_NAMES && -x "t/pi2.pl");
+  skip "t/pi2.pl not found", $nt3 unless ( $host && $operative &&  @MACHINE_NAMES && -x "t/pi2.pl");
 
   my $r = qx{perl -I./lib/ t/pi2.pl 2>&1};
   
@@ -74,7 +77,7 @@ SKIP: {
 
 
 SKIP: {
-  skip "t/pi3.pl not found", $nt4 unless ( (findVersion() > 5.6) && @MACHINE_NAMES && -r "t/pi3.pl");
+  skip "t/pi3.pl not found", $nt4 unless ( $host && $operative &&  @MACHINE_NAMES && -r "t/pi3.pl");
 
   my $r = qx{perl -I./lib/ t/pi3.pl 2>&1};
   
@@ -85,12 +88,9 @@ SKIP: {
   like($r, $expected,'Computing pi in parallel. Lazy arguments');
 }
 
-my $host = ($ENV{GRID_REMOTE_MACHINE} || ''); 
-my $operative = 0;
-$operative = is_operative('ssh', $host,'perldoc -l Inline::C') if $ENV{DEVELOPER};
 SKIP: {
   ##  mmm requires Inline::C installed in the remote machine
-  skip "t/pi4.pl not found", $nt5 unless ( (findVersion() > 5.6) && -r "t/pi4.pl" && $operative);
+  skip "t/pi4.pl not found", $nt5 unless ( $host && $operative &&  -r "t/pi4.pl" && $operative);
 
   my $r = qx{perl -I./lib/ t/pi4.pl 2>&1};
   
@@ -108,7 +108,7 @@ for (@MACHINE_NAMES) {
 }
 
 SKIP: {
-  skip "t/pi5.pl not found", $nt6 unless ( (findVersion() > 5.6) && @MACHINE_NAMES && -r "t/pi5.pl" && $operative);
+  skip "t/pi5.pl not found", $nt6 unless ( $host && $operative &&  @MACHINE_NAMES && -r "t/pi5.pl" && $operative);
 
   my $r = qx{perl -I./lib/ t/pi5.pl 2>&1};
   
@@ -120,7 +120,7 @@ SKIP: {
 }
 
 SKIP: {
-  skip "t/pi6.pl not found", $nt7 unless ( (findVersion() > 5.6) && @MACHINE_NAMES && -r "t/pi6.pl" && $operative);
+  skip "t/pi6.pl not found", $nt7 unless ( $host && $operative &&  @MACHINE_NAMES && -r "t/pi6.pl" && $operative);
 
   my $r = qx{perl -I./lib/ t/pi6.pl 2>&1};
   
@@ -133,7 +133,7 @@ SKIP: {
 
 
 SKIP: {
-  skip "t/pi7.pl not found", $nt8 unless ( (findVersion() > 5.6) && @MACHINE_NAMES && -r "t/pi7.pl" && $operative);
+  skip "t/pi7.pl not found", $nt8 unless ( $host && $operative &&  @MACHINE_NAMES && -r "t/pi7.pl" && $operative);
 
   my $r = qx{perl -I./lib/ t/pi7.pl 2>&1};
   
@@ -146,7 +146,7 @@ SKIP: {
 
 
 SKIP: {
-  skip "t/waitpi.pl not found", $nt9 unless ( (findVersion() > 5.6) && -r "t/waitpi.pl" && $operative);
+  skip "t/waitpi.pl not found", $nt9 unless ( $host && $operative &&  -r "t/waitpi.pl" && $operative);
 
   my $r = qx{perl -I./lib/ t/waitpi.pl 2>&1};
   

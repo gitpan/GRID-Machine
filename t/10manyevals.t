@@ -12,7 +12,7 @@ BEGIN { use_ok('GRID::Machine', qw(is_operative qc)) };
 my $host = $ENV{GRID_REMOTE_MACHINE} || '';
 
 SKIP: {
-  skip "Remote not operative", 1 unless (findVersion() > 5.6) && ($^O =~ /darwin|n[ui]x/) && is_operative('ssh', $host);
+  skip "Remote not operative", 1 unless $host and  ($^O =~ /darwin|n[ui]x/) && is_operative('ssh', $host);
 
 ########################################################################
 
